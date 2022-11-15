@@ -72,6 +72,8 @@ function getEXT(file)
 	return ""
 end
 
+
+
 function concatunderEXT(name,con)
 	local dot = string_findlast(name,"%.")
 	if dot then
@@ -81,8 +83,11 @@ function concatunderEXT(name,con)
 	end
 end
 
+local incrementHistory = {}
+
 function incrementPathName(path,limit)
-	local addednumber = ""
+	incrementHistory[path] = incrementHistory[path] or ""
+	local addednumber = incrementHistory[path]
 	local numbertotry = 2
 	limit = tonumber(limit) or 1000000
 	while limit > 1 do
@@ -95,6 +100,14 @@ function incrementPathName(path,limit)
 				addednumber = "_("..tostring(numbertotry)..")"
 			end
 		else
+			local hcount = 0
+			for _,_ in pairs(incrementHistory) do
+				hcount = hcount+1
+			end
+			if hcount > 10000 then
+				incrementHistory = {}
+			end
+			incrementHistory[path] = addednumber
 			return filesavepath
 		end
 		limit = limit - 1

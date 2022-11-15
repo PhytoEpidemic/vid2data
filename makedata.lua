@@ -166,10 +166,9 @@ function printset()
 		print("Remove blurred frames: "..(config.removeblur or "n"))
 	else
 		print("Selected Folder: "..(config.vfile or "none"))
-		print("Custom name: "..(config.cfilename or "none"))
-		print("Delete after slicing: "..(config.delimg or "none"))
-		
 	end
+	print("Custom name: "..(config.cfilename or "none"))
+	print("Delete after slicing: "..(config.delimg or "n"))
 end
 
 

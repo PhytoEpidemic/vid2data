@@ -16,4 +16,4 @@ The newest version of ffmpeg is required and is included in vid2data.exe so that
 
 Download the latest offical release by clicking this link: https://github.com/PhytoEpidemic/vid2data/releases/download/Official/vid2data.exe
 
-Don't download the vid2data.exe in the source repo as that is just a lua interpreter
+Don't download the vid2data.exe in the source repo as that is just a lua interpreter.

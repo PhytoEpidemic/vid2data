@@ -7,10 +7,10 @@ To use, simply run the vid2data.exe and a console will open and you can drag and
 
 Options are:
 
- Key frames only<br />
- Remove blurred frames (Does not work well if the whole video is partly blurry)<br />
- Custom name (Applied to the final sliced up images)<br />
- Delete after slicing (Deletes original frames after slicing. Be mindful when useing on a folder of images, always make copies of your data)<br />
+ Key frames only [y/n]<br />
+ Remove blurred frames [y/n] (Does not work well if the whole video is partly blurry)<br />
+ Custom name [words] (Applied to the final sliced up images)<br />
+ Delete after slicing [y/n] (Deletes original frames after slicing. Be mindful when useing on a folder of images, always make copies of your data)<br />
 
 The newest version of ffmpeg is required and is included in vid2data.exe so that is why the file is over 40MB instead of under 1MB
 

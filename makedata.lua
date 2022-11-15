@@ -71,6 +71,36 @@ function getEXT(file)
 	end
 	return ""
 end
+
+function concatunderEXT(name,con)
+	local dot = string_findlast(name,"%.")
+	if dot then
+		return (name:sub(1,dot-1))..con..(name:sub(dot,#name))
+	else
+		return name..con
+	end
+end
+
+function incrementPathName(path,limit)
+	local addednumber = ""
+	local numbertotry = 2
+	limit = tonumber(limit) or 1000000
+	while limit > 1 do
+		local filesavepath = concatunderEXT(path, addednumber)
+		if lfs.attributes(filesavepath) then
+			if addednumber == "" then
+				addednumber = "_(2)"
+			else
+				numbertotry = numbertotry+1
+				addednumber = "_("..tostring(numbertotry)..")"
+			end
+		else
+			return filesavepath
+		end
+		limit = limit - 1
+	end
+end
+
 function padNum(str)
 	local fulldigits = [[00000000]]
 	str = str:gsub(" ","")
@@ -113,27 +143,52 @@ function splitImage(tw,th,ow,oh)
 	
 	return cells
 end
+
+
 local config = {}
 function printset()
-	print("Selected Video: "..(config.vfile or "none"))
-	print("Key frames only: "..(config.keyframesonly or "n"))
-	print("Remove blurred frames: "..(config.removeblur or "n"))
-	
+	if not config.folder then
+		print("Selected Video: "..(config.vfile or "none"))
+		print("Key frames only: "..(config.keyframesonly or "n"))
+		print("Remove blurred frames: "..(config.removeblur or "n"))
+	else
+		print("Selected Folder: "..(config.vfile or "none"))
+		print("Custom name: "..(config.cfilename or "none"))
+		print("Delete after slicing: "..(config.delimg or "none"))
+		
+	end
 end
 
 
 rtitle()
-print("Drag and drop your video file or type in the exact location.")
+print("Drag and drop your video file or folder of images")
 config.vfile = (io.read():gsub('"',""))
-cls()
-printset()
-print("Key frames only?")
-config.keyframesonly = (io.read():gsub('"',""))
-cls()
-printset()
-print("Remove blurred frames?")
-config.removeblur = (io.read():gsub('"',""))
 local framesFolder = config.vfile..[[_frames]]
+if lfs.attributes(config.vfile).mode == "directory" then
+	framesFolder = config.vfile
+	config.folder = true
+end
+if not config.folder then
+	cls()
+	printset()
+	print("Key frames only?")
+	config.keyframesonly = (io.read():gsub('"',""))
+	cls()
+	printset()
+	print("Remove blurred frames?")
+	config.removeblur = (io.read():gsub('"',""))	
+end
+
+cls()
+printset()
+print("Add custom file name?")
+config.cfilename = (io.read():gsub('"',""))
+cls()
+printset()
+print("Delete after slicing?")
+config.delimg = (io.read():gsub('"',""))
+
+
 print("")
 exe([[mkdir "]]..framesFolder..[["]])
 --exe([[mkdir "]]..framesFolder..[[mp"]])
@@ -142,56 +197,86 @@ if config.keyframesonly == "y" then
 else
 	config.keyframesonly = ""
 end
-exe([[ffmpeg.exe]]..config.keyframesonly..[[ -i "]]..config.vfile..[[" -vf mpdecimate,setpts=N/FRAME_RATE/TB,blurdetect=block_width=128:block_height=128:block_pct=95,metadata=print:file=log.txt "]]..framesFolder..[[/%08d.png"]])
---exe([[ffmpeg.exe -i "]]..framesFolder..[[" -vf mpdecimate=hi=200:lo=200:frac=1:max=0,setpts=N/FRAME_RATE/TB "]]..framesFolder..[[mp/%08d.png"]])
-
-if config.removeblur == "y" then
-	local blurlogf = io.open("log.txt","r")
-	local framec = "0"
-	local blur = "0"
-	for line in blurlogf:lines() do
-		if line:find("frame") then
-			local ptss = line:find("pts")
-			framec = (line:sub(7,ptss-2)):gsub(" ","")
-			blur = "0"
-		end
-		
-		if line:find("lavfi.blur=") then
-			local _,skipstr = line:find("lavfi.blur=")
-			blur = (line:sub(skipstr+1,#line))
-		end
-		if framec ~= "0" and blur ~= "0" then
-			local filename = padNum(framec)..".png"
-			local blurnum = tonumber(blur)
-			if blurnum > 9 then
-				
-				os.remove(framesFolder.."\\"..filename)
-				print(filename)
-				print(blur)
+if not config.folder then
+	exe([[ffmpeg.exe]]..config.keyframesonly..[[ -i "]]..config.vfile..[[" -vf mpdecimate,setpts=N/FRAME_RATE/TB,blurdetect=block_width=128:block_height=128:block_pct=95,metadata=print:file=log.txt "]]..framesFolder..[[/%08d.png"]])
+end
+function removeBl()
+	if config.removeblur == "y" then
+		local blurlogf = io.open("log.txt","r")
+		local framec = "0"
+		local blur = "0"
+		for line in blurlogf:lines() do
+			if line:find("frame") then
+				local ptss = line:find("pts")
+				framec = (line:sub(7,ptss-2)):gsub(" ","")
+				blur = "0"
 			end
 			
+			if line:find("lavfi.blur=") then
+				local _,skipstr = line:find("lavfi.blur=")
+				blur = (line:sub(skipstr+1,#line)):gsub(" ","")
+			end
+			if framec ~= "0" and blur ~= "0" and blur ~= "nan" then
+				local filename = padNum(framec)..".png"
+				local blurnum = tonumber(blur)
+				print(filename,blur,blurnum)
+				if blurnum > 9 then
+					
+					os.remove(framesFolder.."\\"..filename)
+					print(filename)
+					print(blur)
+				end
+				
+			end
 		end
 	end
 end
+local OK, er = pcall(removeBl)
+if not OK then
+	print(er)
+	pause()
+end
+if config.delimg ~= "y" then
+	exe([[mkdir "]]..framesFolder..[[/output"]])
+end
 
 
-
-
-for file in lfs.dir(framesFolder) do
-	if isAllowed(file) then
-		local filepath = framesFolder.."\\"..file
-		if lfs.attributes(filepath).mode == "file" then
-			local width, height = imagedim.GetImageWidthHeight(filepath)
-			if width ~= 512 or height ~= 512 then
-				print(width,height)
-				local cells = splitImage(512,512,width,height)
-				for i,cell in ipairs(cells) do
-					os.execute([[ffmpeg -i "]]..filepath..[[" -vf "crop=]]..tostring(cell.w)..[[:]]..tostring(cell.h)..[[:]]..tostring(cell.x)..[[:]]..tostring(cell.y)..[[" "]]..filepath..[[_crop]]..tostring(i)..[[.png"]])
+function splitframes()
+	for file in lfs.dir(framesFolder) do
+		if isAllowed(file) then
+			local filepath = framesFolder.."\\"..file
+			if lfs.attributes(filepath).mode == "file" then
+				local outputName = framesFolder
+				if config.delimg ~= "y" then
+					outputName = outputName.."\\output"
 				end
-				os.remove(filepath)
+				if config.cfilename ~= "" then
+					outputName = outputName.."\\"..config.cfilename..".png"
+				else
+					outputName = outputName.."\\"..file..".png"
+				end
+				
+				local width, height = imagedim.GetImageWidthHeight(filepath)
+				if width ~= 512 or height ~= 512 then
+					print(width,height)
+					local cells = splitImage(512,512,width,height)
+					for i,cell in ipairs(cells) do
+						
+						os.execute([[ffmpeg -i "]]..filepath..[[" -vf "crop=]]..tostring(cell.w)..[[:]]..tostring(cell.h)..[[:]]..tostring(cell.x)..[[:]]..tostring(cell.y)..[[" "]]..incrementPathName(outputName)..[["]])
+					end
+					if config.delimg == "y" then
+						os.remove(filepath)
+					end
+					
+				end
 			end
 		end
 	end
+end
+local OK, er = pcall(splitframes)
+if not OK then
+	print(er)
+	pause()
 end
 cls()
 

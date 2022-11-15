@@ -26,17 +26,17 @@ DisplayLicense=
 FinishMessage=
 TargetName=L:\DataProc\vid2data.exe
 FriendlyName=t
-AppLaunched=lua.exe makedata.lua
+AppLaunched=vid2data.exe makedata.lua
 PostInstallCmd=<None>
 AdminQuietInstCmd=
 UserQuietInstCmd=
 FILE0="ffmpeg.exe"
-FILE1="lua.exe"
-FILE2="lua5.1.dll"
-FILE3="makedata.lua"
-FILE4="lfs.dll"
-FILE5="imagedim.lua"
-FILE6="LICENSE"
+FILE1="lua5.1.dll"
+FILE2="makedata.lua"
+FILE3="lfs.dll"
+FILE4="imagedim.lua"
+FILE5="LICENSE"
+FILE6="vid2data.exe"
 [SourceFiles]
 SourceFiles0=L:\DataProc\vid2data\
 [SourceFiles0]

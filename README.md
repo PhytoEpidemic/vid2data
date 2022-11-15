@@ -14,5 +14,6 @@ Options are:
 
 The newest version of ffmpeg is required and is included in vid2data.exe so that is why the file is over 40MB instead of under 1MB
 
-Download by clicking this link: https://github.com/PhytoEpidemic/vid2data/releases/download/Official/vid2data.exe
+Download the latest offical release by clicking this link: https://github.com/PhytoEpidemic/vid2data/releases/download/Official/vid2data.exe
 
+Don't download the vid2data.exe in the source repo as that is just a lua interpreter

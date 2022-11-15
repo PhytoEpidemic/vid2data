@@ -86,9 +86,9 @@ end
 local incrementHistory = {}
 
 function incrementPathName(path,limit)
-	incrementHistory[path] = incrementHistory[path] or ""
-	local addednumber = incrementHistory[path]
-	local numbertotry = 2
+	incrementHistory[path] = incrementHistory[path] or 2
+	local addednumber = ""
+	local numbertotry = incrementHistory[path]
 	limit = tonumber(limit) or 1000000
 	while limit > 1 do
 		local filesavepath = concatunderEXT(path, addednumber)
@@ -107,7 +107,7 @@ function incrementPathName(path,limit)
 			if hcount > 10000 then
 				incrementHistory = {}
 			end
-			incrementHistory[path] = addednumber
+			incrementHistory[path] = numbertotry
 			return filesavepath
 		end
 		limit = limit - 1

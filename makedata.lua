@@ -198,7 +198,7 @@ else
 	config.keyframesonly = ""
 end
 if not config.folder then
-	exe([[ffmpeg.exe]]..config.keyframesonly..[[ -i "]]..config.vfile..[[" -vf mpdecimate,setpts=N/FRAME_RATE/TB,blurdetect=block_width=128:block_height=128:block_pct=95,metadata=print:file=log.txt "]]..framesFolder..[[/%08d.png"]])
+	exe([[ffmpeg.exe]]..config.keyframesonly..[[ -i "]]..config.vfile..[[" -vf mpdecimate,setpts=N/FRAME_RATE/TB,blurdetect=block_width=128:block_height=128:block_pct=95,blackdetect=d=0,metadata=print:file=log.txt "]]..framesFolder..[[/%08d.png"]])
 end
 function removeBl()
 	if config.removeblur == "y" then

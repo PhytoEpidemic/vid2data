@@ -89,7 +89,7 @@ function incrementPathName(path,limit)
 	incrementHistory[path] = incrementHistory[path] or 2
 	local addednumber = ""
 	local numbertotry = incrementHistory[path]
-	limit = tonumber(limit) or 1000000
+	limit = tonumber(limit) or 99999999
 	while limit > 1 do
 		local filesavepath = concatunderEXT(path, addednumber)
 		if lfs.attributes(filesavepath) then
@@ -183,12 +183,12 @@ end
 if not config.folder then
 	cls()
 	printset()
-	print("Key frames only?")
+	print("Keep key frames only? [y/n]")
 	config.keyframesonly = (io.read():gsub('"',""))
 	cls()
 	printset()
-	print("Remove blurred frames?")
-	config.removeblur = (io.read():gsub('"',""))	
+	print("Remove blurred frames?[0-20] (threshold blur level for removal. Lower number will remove more frames)")
+	config.removeblur = (io.read():gsub('"',""))
 end
 
 cls()
@@ -232,7 +232,7 @@ function removeBl()
 				local filename = padNum(framec)..".png"
 				local blurnum = tonumber(blur)
 				print(filename,blur,blurnum)
-				if blurnum > 9 then
+				if blurnum > (tonumber(config.removeblur) or 0) then
 					
 					os.remove(framesFolder.."\\"..filename)
 					print(filename)
@@ -279,7 +279,10 @@ function splitframes()
 					if config.delimg == "y" then
 						os.remove(filepath)
 					end
-					
+				else
+					if config.cfilename ~= "" then
+						os.rename(filepath,incrementPathName(outputName))
+					end
 				end
 			end
 		end

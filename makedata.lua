@@ -241,7 +241,9 @@ function removeBl()
 				
 			end
 		end
+		blurlogf:close()
 	end
+	os.remove("log.txt")
 end
 local OK, er = pcall(removeBl)
 if not OK then
@@ -251,13 +253,36 @@ end
 if config.delimg ~= "y" then
 	exe([[mkdir "]]..framesFolder..[[/output"]])
 end
+function upscaleMedia(imagename,factor,suffix)
+	local factor = tostring(factor or 2)
+	suffix = suffix or "_d"..factor
+	local outputname = incrementPathName(concatunderEXT(imagename,suffix))
+	os.execute([[ffmpeg -i "]]..imagename..[[" -vf scale="iw*]]..factor..[[:ih*]]..factor..[[" -sws_flags lanczos+full_chroma_inp "]]..outputname..[["]])
+	return outputname
+end
 
+function upscaleMediaByPx(imagename,width,height,suffix)
+	suffix = suffix or "_d"..tostring(width)..[[x]]..tostring(height)
+	local outputname = incrementPathName(concatunderEXT(imagename,suffix))
+	os.execute([[ffmpeg -i "]]..imagename..[[" -vf scale=]]..tostring(width)..[[:]]..tostring(height)..[[ -sws_flags lanczos+full_chroma_inp "]]..outputname..[["]])
+	return outputname
+end
 
 function splitframes()
+	local imagecount = 0
 	for file in lfs.dir(framesFolder) do
 		if isAllowed(file) then
+			imagecount = imagecount+1
+		end
+	end
+	local progress = 0
+	for file in lfs.dir(framesFolder) do
+		if isAllowed(file) then
+			if progress%math.ceil(imagecount/1000)==0 then
+				stitle("Slicing: "..tostring(math.floor(progress/imagecount*1000)/10).."%")
+			end
 			local filepath = framesFolder.."\\"..file
-			if lfs.attributes(filepath).mode == "file" then
+			if lfs.attributes(filepath) and lfs.attributes(filepath).mode == "file" then
 				local outputName = framesFolder
 				if config.delimg ~= "y" then
 					outputName = outputName.."\\output"
@@ -269,7 +294,23 @@ function splitframes()
 				end
 				
 				local width, height = imagedim.GetImageWidthHeight(filepath)
+				local madetemp = false
 				if width ~= 512 or height ~= 512 then
+					if width < 512 or height < 512 then
+						local xdiff = math.abs(width-512)
+						local ydiff = math.abs(height-512)
+						if ydiff >= xdiff then
+							ydiff = -1
+							xdiff = 512
+						else
+							xdiff = -1
+							ydiff = 512
+						end
+						local newfilename = upscaleMediaByPx(filepath,xdiff,ydiff)
+						madetemp = filepath
+						filepath = newfilename
+						width, height = imagedim.GetImageWidthHeight(filepath)
+					end
 					print(width,height)
 					local cells = splitImage(512,512,width,height)
 					for i,cell in ipairs(cells) do
@@ -278,13 +319,16 @@ function splitframes()
 					end
 					if config.delimg == "y" then
 						os.remove(filepath)
+						if madetemp then os.remove(madetemp) end
 					end
 				else
 					if config.cfilename ~= "" then
 						os.rename(filepath,incrementPathName(outputName))
 					end
 				end
+				if madetemp then os.remove(filepath) end
 			end
+			progress = progress+1
 		end
 	end
 end
@@ -293,6 +337,7 @@ if not OK then
 	print(er)
 	pause()
 end
+rtitle()
 cls()
 
 pause()

@@ -132,19 +132,19 @@ function splitImage(tw,th,ow,oh)
 	local hpadding = (th*hextra)/hfull
 	
 	
-	for i=0,wfull do
-		for j=0,hfull do
+	for i=0,math.ceil(wsplits)-1 do
+		for j=0,math.ceil(hsplits)-1 do
 			local cell = {}
 			cell.w = tw
 			cell.h = th
 			cell.x = i*tw
 			if i>0 then
-				cell.x = cell.x-wpadding
+				cell.x = cell.x-wpadding*(i)
 			end
 			
 			cell.y = j*th
 			if j>0 then
-				cell.y = cell.y-hpadding
+				cell.y = cell.y-hpadding*(j)
 			end
 				
 			
@@ -156,7 +156,25 @@ function splitImage(tw,th,ow,oh)
 	
 	return cells
 end
-
+function splitstring(str,pat)
+	local listowords = {}
+	while str:find(pat) do
+		local found, foundend = str:find(pat)
+		table.insert(listowords,str:sub(1,found-1))
+		if foundend < #str then
+			str = str:sub(foundend+1,#str)
+		else
+			str = false
+			break
+		end
+		
+	end
+	if str then
+		table.insert(listowords,str)
+	end
+	
+	return listowords
+end
 
 local config = {}
 function printset()
@@ -169,6 +187,12 @@ function printset()
 	end
 	print("Custom name: "..(config.cfilename or "none"))
 	print("Delete after slicing: "..(config.delimg or "n"))
+	if config.WaH then
+		print("Output width and height: "..tostring(config.width).."x"..tostring(config.height))
+	else
+		print("Output width and height: 512x512")
+	end
+	
 end
 
 
@@ -199,8 +223,48 @@ cls()
 printset()
 print("Delete after slicing?")
 config.delimg = (io.read():gsub('"',""))
+cls()
+printset()
+print("Custom width and height (default 512x512, format WIDTHxHEIGHT or WIDTH,HEIGHT)(type a single number for 1:1 aspect ratio)?")
+config.WaH = string.lower((io.read():gsub('"',"")):gsub(" ",""):gsub(",","x"))
+if config.WaH ~= "" then
+	local splits = splitstring(config.WaH,"x")
+	if #splits == 1 then
+		if tonumber(splits[1]) then
+			config.width = tonumber(splits[1])
+			config.height = tonumber(splits[1])
+		else
+			config.width = 512
+			config.height = 512
+		end
+	elseif #splits == 2 then
+		if tonumber(splits[1]) then
+			config.width = tonumber(splits[1])
+		else
+			config.width = 512
+		end
+		if tonumber(splits[2]) then
+			config.height = tonumber(splits[2])
+		else
+			config.height = 512
+		end
+	else
+		config.width = 512
+		config.height = 512
+	end
+else
+	config.width = 512
+	config.height = 512
+end
 
 
+cls()
+printset()
+print("Are you ready?")
+local gonow = (io.read():gsub('"',""))
+if gonow ~= "y" then
+	os.exit()
+end
 print("")
 exe([[mkdir "]]..framesFolder..[["]])
 --exe([[mkdir "]]..framesFolder..[[mp"]])
@@ -295,35 +359,41 @@ function splitframes()
 				
 				local width, height = imagedim.GetImageWidthHeight(filepath)
 				local madetemp = false
-				if width ~= 512 or height ~= 512 then
-					if width < 512 or height < 512 then
-						local xdiff = math.abs(width-512)
-						local ydiff = math.abs(height-512)
-						if ydiff >= xdiff then
-							ydiff = -1
-							xdiff = 512
+				if width ~= config.width or height ~= config.height then
+					if width < config.width or height < config.height then
+						local xdiff = -1
+						local ydiff = -1
+						if height >= width then
+							xdiff = config.width
 						else
-							xdiff = -1
-							ydiff = 512
+							ydiff = config.height
 						end
-						local newfilename = upscaleMediaByPx(filepath,xdiff,ydiff)
 						madetemp = filepath
-						filepath = newfilename
+						filepath = upscaleMediaByPx(filepath,xdiff,ydiff)
 						width, height = imagedim.GetImageWidthHeight(filepath)
 					end
+					print(file)
 					print(width,height)
-					local cells = splitImage(512,512,width,height)
-					for i,cell in ipairs(cells) do
+					--pause()
+					local cells = splitImage(config.width,config.height,width,height)
+					if #cells>1 then
+						for i,cell in ipairs(cells) do
 						
-						os.execute([[ffmpeg -i "]]..filepath..[[" -vf "crop=]]..tostring(cell.w)..[[:]]..tostring(cell.h)..[[:]]..tostring(cell.x)..[[:]]..tostring(cell.y)..[[" "]]..incrementPathName(outputName)..[["]])
+							os.execute([[ffmpeg -i "]]..filepath..[[" -vf "crop=]]..tostring(cell.w)..[[:]]..tostring(cell.h)..[[:]]..tostring(cell.x)..[[:]]..tostring(cell.y)..[[" "]]..incrementPathName(outputName)..[["]])
+						end
 					end
+					--pause()
 					if config.delimg == "y" then
 						os.remove(filepath)
 						if madetemp then os.remove(madetemp) end
 					end
 				else
 					if config.cfilename ~= "" then
-						os.rename(filepath,incrementPathName(outputName))
+						if config.delimg == "y" then
+							os.rename(filepath,incrementPathName(outputName))
+						else
+							os.execute([[copy "]]..filepath..[[" "]]..incrementPathName(outputName)..[["]])
+						end
 					end
 				end
 				if madetemp then os.remove(filepath) end

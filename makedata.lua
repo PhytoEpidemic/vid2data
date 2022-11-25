@@ -186,6 +186,7 @@ function printset()
 		print("Selected Folder: "..(config.vfile or "none"))
 	end
 	print("Custom name: "..(config.cfilename or "none"))
+	print("Custom caption: "..(config.caption or "none"))
 	print("Delete after slicing: "..(config.delimg or "n"))
 	if config.WaH then
 		print("Output width and height: "..tostring(config.width).."x"..tostring(config.height))
@@ -219,6 +220,10 @@ cls()
 printset()
 print("Add custom file name?")
 config.cfilename = (io.read():gsub('"',""))
+cls()
+printset()
+print("Add custom caption file?")
+config.caption = (io.read():gsub('"',""))
 cls()
 printset()
 print("Delete after slicing?")
@@ -340,6 +345,14 @@ function splitframes()
 		end
 	end
 	local progress = 0
+	local function makecaptionfile(imagefilepath)
+		if config.caption ~= "" then
+			local txtfilepath = imagefilepath:sub(1,#imagefilepath-(#getEXT(imagefilepath))).."txt"
+			local captionfile = io.open(txtfilepath,"w")
+			captionfile:write(config.caption)
+			captionfile:close()
+		end
+	end
 	for file in lfs.dir(framesFolder) do
 		if isAllowed(file) then
 			if progress%math.ceil(imagecount/1000)==0 then
@@ -356,7 +369,6 @@ function splitframes()
 				else
 					outputName = outputName.."\\"..file..".png"
 				end
-				
 				local width, height = imagedim.GetImageWidthHeight(filepath)
 				local madetemp = false
 				if width ~= config.width or height ~= config.height then
@@ -378,8 +390,9 @@ function splitframes()
 					local cells = splitImage(config.width,config.height,width,height)
 					if #cells>1 then
 						for i,cell in ipairs(cells) do
-						
-							os.execute([[ffmpeg -i "]]..filepath..[[" -vf "crop=]]..tostring(cell.w)..[[:]]..tostring(cell.h)..[[:]]..tostring(cell.x)..[[:]]..tostring(cell.y)..[[" "]]..incrementPathName(outputName)..[["]])
+							local tempoutputName = incrementPathName(outputName)
+							os.execute([[ffmpeg -i "]]..filepath..[[" -vf "crop=]]..tostring(cell.w)..[[:]]..tostring(cell.h)..[[:]]..tostring(cell.x)..[[:]]..tostring(cell.y)..[[" "]]..tempoutputName..[["]])
+							makecaptionfile(tempoutputName)
 						end
 					end
 					--pause()
@@ -388,14 +401,15 @@ function splitframes()
 						if madetemp then os.remove(madetemp) end
 					end
 				else
-					if config.cfilename ~= "" then
-						if config.delimg == "y" then
-							os.rename(filepath,incrementPathName(outputName))
-						else
-							os.execute([[copy "]]..filepath..[[" "]]..incrementPathName(outputName)..[["]])
-						end
+					local tempoutputName = incrementPathName(outputName)
+					if config.delimg == "y" and cfilename ~= "" then
+						os.rename(filepath,tempoutputName)
+					else
+						os.execute([[copy "]]..filepath..[[" "]]..tempoutputName..[["]])
 					end
+					makecaptionfile(tempoutputName)
 				end
+				
 				if madetemp then os.remove(filepath) end
 			end
 			progress = progress+1

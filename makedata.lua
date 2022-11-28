@@ -124,14 +124,12 @@ function splitImage(tw,th,ow,oh)
 	local cells = {}
 	local wsplits = ow/tw
 	local wfull = math.floor(wsplits)
-	local wextra = 1-(wsplits-wfull)
+	local wextra = (wsplits-wfull)
 	local wpadding = (tw*wextra)/wfull
 	local hsplits = oh/th
 	local hfull = math.floor(hsplits)
-	local hextra = 1-(hsplits-hfull)
+	local hextra = (hsplits-hfull)
 	local hpadding = (th*hextra)/hfull
-	
-	
 	for i=0,math.ceil(wsplits)-1 do
 		for j=0,math.ceil(hsplits)-1 do
 			local cell = {}
@@ -141,19 +139,13 @@ function splitImage(tw,th,ow,oh)
 			if i>0 then
 				cell.x = cell.x-wpadding*(i)
 			end
-			
 			cell.y = j*th
 			if j>0 then
 				cell.y = cell.y-hpadding*(j)
 			end
-				
-			
-			
 			table.insert(cells,cell)
 		end
 	end
-	
-	
 	return cells
 end
 function splitstring(str,pat)
@@ -320,7 +312,8 @@ if not OK then
 	pause()
 end
 if config.delimg ~= "y" then
-	exe([[mkdir "]]..framesFolder..[[/output"]])
+	config.delimg = incrementPathName(framesFolder.."\\output")
+	exe([[mkdir "]]..config.delimg..[["]])
 end
 function upscaleMedia(imagename,factor,suffix)
 	local factor = tostring(factor or 2)
@@ -362,7 +355,7 @@ function splitframes()
 			if lfs.attributes(filepath) and lfs.attributes(filepath).mode == "file" then
 				local outputName = framesFolder
 				if config.delimg ~= "y" then
-					outputName = outputName.."\\output"
+					outputName = config.delimg
 				end
 				if config.cfilename ~= "" then
 					outputName = outputName.."\\"..config.cfilename..".png"
@@ -371,7 +364,7 @@ function splitframes()
 				end
 				local width, height = imagedim.GetImageWidthHeight(filepath)
 				local madetemp = false
-				if width ~= config.width or height ~= config.height then
+				if (width ~= config.width or height ~= config.height) and (width and height) then
 					if width < config.width or height < config.height then
 						local xdiff = -1
 						local ydiff = -1
@@ -400,7 +393,7 @@ function splitframes()
 						os.remove(filepath)
 						if madetemp then os.remove(madetemp) end
 					end
-				else
+				elseif (width and height) then
 					local tempoutputName = incrementPathName(outputName)
 					if config.delimg == "y" and cfilename ~= "" then
 						os.rename(filepath,tempoutputName)

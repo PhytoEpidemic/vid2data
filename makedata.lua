@@ -1,5 +1,6 @@
 lfs = require("lfs")
 imagedim = require("imagedim")
+lfsaddons = require("lfsaddons")
 function exe(str)
 	os.execute(str)
 end
@@ -113,6 +114,37 @@ function incrementPathName(path,limit)
 		limit = limit - 1
 	end
 end
+function secondsToReadable(sec)
+	if not tonumber(sec) then
+		return sec
+	end
+	local readable = ""
+	local int
+	local addS
+	int = math.floor(sec/60/60/24)
+	if int > 0 then
+		if int ~= 1 then addS = "s" else addS = "" end
+		readable = readable..(int).." day"..addS..", "
+	end
+	int = math.floor(sec/60/60)
+	if int > 0 then
+		if int%24 ~= 1 then addS = "s" else addS = "" end
+		readable = readable..(int%24).." hour"..addS..", "
+	end
+	int = math.floor(sec/60)
+	if int > 0 then
+		if int%60 ~= 1 then addS = "s" else addS = "" end
+		readable = readable..(int%60).." minute"..addS.." and "
+	end
+	int = math.floor(sec)
+	if int > 0 then
+		if int%60 ~= 1 then addS = "s" else addS = "" end
+		readable = readable..(int%60).." second"..addS
+	else
+		readable = readable..(math.floor(sec*10)/10).." seconds"
+	end
+	return readable
+end
 
 function padNum(str)
 	local fulldigits = [[00000000]]
@@ -130,6 +162,12 @@ function splitImage(tw,th,ow,oh)
 	local hfull = math.floor(hsplits)
 	local hextra = 1-(hsplits-hfull)
 	local hpadding = (th*hextra)/hfull
+	if wsplits == 1 then
+		wfull = 0
+	end
+	if hsplits == 1 then
+		hfull = 0
+	end
 	for i=0,wfull do
 		for j=0,hfull do
 			local cell = {}
@@ -192,7 +230,7 @@ end
 rtitle()
 print("Drag and drop your video file or folder of images")
 config.vfile = (io.read():gsub('"',""))
-local framesFolder = config.vfile..[[_frames]]
+local framesFolder = incrementPathName(config.vfile..[[_frames]])
 if lfs.attributes(config.vfile).mode == "directory" then
 	framesFolder = config.vfile
 	config.folder = true
@@ -262,6 +300,7 @@ local gonow = (io.read():gsub('"',""))
 if gonow ~= "y" then
 	os.exit()
 end
+local programstarttime = os.time()
 print("")
 exe([[mkdir "]]..framesFolder..[["]])
 --exe([[mkdir "]]..framesFolder..[[mp"]])
@@ -331,6 +370,7 @@ function upscaleMediaByPx(imagename,width,height,suffix)
 end
 
 function splitframes()
+	local starttime = os.time()
 	local imagecount = 0
 	for file in lfs.dir(framesFolder) do
 		if isAllowed(file) then
@@ -349,7 +389,14 @@ function splitframes()
 	for file in lfs.dir(framesFolder) do
 		if isAllowed(file) then
 			if progress%math.ceil(imagecount/1000)==0 then
-				stitle("Slicing: "..tostring(math.floor(progress/imagecount*1000)/10).."%")
+				local currenttime = os.time()
+				local percentagecomplete = progress/imagecount
+				local percentpersecond = (percentagecomplete*100)/(currenttime-starttime)
+				local ETA = secondsToReadable((100-(percentagecomplete*100))/percentpersecond)
+				if percentagecomplete < 0.01 or currenttime == starttime then
+					ETA = "Calculating..."
+				end
+				stitle("Slicing: "..tostring(math.floor(percentagecomplete*1000)/10).."% ETA: "..ETA)
 			end
 			local filepath = framesFolder.."\\"..file
 			if lfs.attributes(filepath) and lfs.attributes(filepath).mode == "file" then
@@ -416,5 +463,6 @@ if not OK then
 end
 rtitle()
 cls()
-
+print(config.vfile)
+print("Completed in "..secondsToReadable(programstarttime-os.time()))
 pause()

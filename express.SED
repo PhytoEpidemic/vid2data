@@ -37,6 +37,7 @@ FILE3="lfs.dll"
 FILE4="imagedim.lua"
 FILE5="LICENSE"
 FILE6="vid2data.exe"
+FILE7="lfsaddons.lua"
 [SourceFiles]
 SourceFiles0=L:\DataProc\vid2data\
 [SourceFiles0]
@@ -47,3 +48,4 @@ SourceFiles0=L:\DataProc\vid2data\
 %FILE4%=
 %FILE5%=
 %FILE6%=
+%FILE7%=

@@ -464,5 +464,5 @@ end
 rtitle()
 cls()
 print(config.vfile)
-print("Completed in "..secondsToReadable(programstarttime-os.time()))
+print("Completed in "..secondsToReadable(os.time()-programstarttime))
 pause()

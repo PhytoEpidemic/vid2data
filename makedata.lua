@@ -207,6 +207,7 @@ function splitstring(str,pat)
 end
 
 local config = {}
+
 function printset()
 	if not config.folder then
 		print("Selected Video: "..(config.vfile or "none"))
@@ -219,13 +220,37 @@ function printset()
 	print("Custom caption: "..(config.caption or "none"))
 	print("Delete after slicing: "..(config.delimg or "n"))
 	if config.WaH then
-		print("Output width and height: "..tostring(config.width).."x"..tostring(config.height))
+		if type(config.width) == "number" then
+			print("Output width and height: "..tostring(config.width).."x"..tostring(config.height))
+			
+		else
+			print("Output width and height: "..tostring(config.WaH))
+		end
+		
 	else
 		print("Output width and height: 512x512")
 	end
 	
 end
 
+local captioncommands = {
+	["--end"] = function(st,to)
+		st = st..to
+		return st
+	end,
+	["--start"] = function(st,to)
+		st = to..st
+		return st
+	end,
+	["--keep"] = function(st,to)
+		return to
+	end,
+}
+
+local supportedImageFiles = {["png"] = true, ["jpg"] = true, ["jpeg"] = true}
+function isSupportedImage(extension)
+	return supportedImageFiles[extension]
+end
 
 rtitle()
 print("Drag and drop your video file or folder of images")
@@ -254,6 +279,15 @@ cls()
 printset()
 print("Add custom caption file?")
 config.caption = (io.read():gsub('"',""))
+if captioncommands[(splitstring(config.caption," ")[1])] then
+	config.captionfunction = captioncommands[(splitstring(config.caption," ")[1])]
+	local newcaption = splitstring(config.caption," ")
+	if #newcaption > 1 then
+		table.remove(newcaption,1)
+	end
+	config.caption = table.concat(newcaption," ")
+end
+
 cls()
 printset()
 print("Delete after slicing?")
@@ -262,7 +296,12 @@ cls()
 printset()
 print("Custom width and height (default 512x512, format WIDTHxHEIGHT or WIDTH,HEIGHT)(type a single number for 1:1 aspect ratio)?")
 config.WaH = string.lower((io.read():gsub('"',"")):gsub(" ",""):gsub(",","x"))
-if config.WaH ~= "" then
+if config.WaH == "avg" then
+	config.width = {}
+	config.height = {}
+
+
+elseif config.WaH ~= "" then
 	local splits = splitstring(config.WaH,"x")
 	if #splits == 1 then
 		if tonumber(splits[1]) then
@@ -370,20 +409,78 @@ function upscaleMediaByPx(imagename,width,height,suffix)
 end
 
 function splitframes()
-	local starttime = os.time()
+	
 	local imagecount = 0
+	local imageDimensions = {}
+	local vidw, vidh = false, false
 	for file in lfs.dir(framesFolder) do
 		if isAllowed(file) then
+			if isSupportedImage(getEXT(file)) then
+				local filepath = framesFolder.."\\"..file
+				local width, height = vidw, vidh
+				
+				if config.folder and not vidw then
+					width, height = imagedim.GetImageWidthHeight(filepath)
+				elseif not vidw then
+					width, height = imagedim.GetImageWidthHeight(filepath)
+					vidw, vidh = width, height
+					
+				else
+					width, height = vidw, vidh 
+				end
+				imageDimensions[filepath] = {width, height}
+			end
+			
+			if imagecount%5 == 0 then
+				cls()
+				print("Loading image info...")
+				print("Folder: "..framesFolder)
+				print("images loaded: "..tostring(imagecount))
+			end
 			imagecount = imagecount+1
 		end
 	end
+	if config.WaH == "avg" then
+		local avgx, avgy = 0, 0
+		local total = 0
+		for _,dim in pairs(imageDimensions) do
+			avgx = avgx+dim[1]
+			avgy = avgy+dim[2]
+			total = total+1
+		end
+		config.width = math.floor(avgx/total)
+		config.height = math.floor(avgy/total)
+	end
+	local starttime = os.time()
 	local progress = 0
-	local function makecaptionfile(imagefilepath)
+	local function makecaptionfile(imagefilepath,caption,captionfunction)
 		if config.caption ~= "" then
 			local txtfilepath = imagefilepath:sub(1,#imagefilepath-(#getEXT(imagefilepath))).."txt"
 			local captionfile = io.open(txtfilepath,"w")
-			captionfile:write(config.caption)
+			local newcaption = config.caption
+			if caption and captionfunction then
+				if captioncommands[newcaption] then
+					newcaption = captionfunction("",caption)
+				else
+					newcaption = captionfunction(newcaption,caption)
+				end
+				
+			end
+			captionfile:write(newcaption)
 			captionfile:close()
+		end
+	end
+	local function getcaptionfile(imagefilepath)
+		if config.caption ~= "" then
+			local txtfilepath = imagefilepath:sub(1,#imagefilepath-(#getEXT(imagefilepath))).."txt"
+			local captionfile = io.open(txtfilepath,"r")
+			local caption = false
+			if captionfile then
+				caption = captionfile:read("*all")
+				captionfile:close()
+			end
+			
+			return caption
 		end
 	end
 	for file in lfs.dir(framesFolder) do
@@ -399,7 +496,7 @@ function splitframes()
 				stitle("Slicing: "..tostring(math.floor(percentagecomplete*1000)/10).."% ETA: "..ETA)
 			end
 			local filepath = framesFolder.."\\"..file
-			if lfs.attributes(filepath) and lfs.attributes(filepath).mode == "file" then
+			if lfs.attributes(filepath) and lfs.attributes(filepath).mode == "file" and isSupportedImage(getEXT(file)) then
 				local outputName = framesFolder
 				if config.delimg ~= "y" then
 					outputName = config.delimg
@@ -409,7 +506,13 @@ function splitframes()
 				else
 					outputName = outputName.."\\"..file..".png"
 				end
-				local width, height = imagedim.GetImageWidthHeight(filepath)
+				local width, height = false, false
+				if imageDimensions[filepath] then
+					width, height = unpack(imageDimensions[filepath])
+				else
+					width, height = imagedim.GetImageWidthHeight(filepath)
+				end
+				
 				local madetemp = false
 				if (width ~= config.width or height ~= config.height) and (width and height) then
 					if width < config.width or height < config.height then
@@ -432,7 +535,11 @@ function splitframes()
 						for i,cell in ipairs(cells) do
 							local tempoutputName = incrementPathName(outputName)
 							os.execute([[ffmpeg -i "]]..filepath..[[" -vf "crop=]]..tostring(cell.w)..[[:]]..tostring(cell.h)..[[:]]..tostring(cell.x)..[[:]]..tostring(cell.y)..[[" "]]..tempoutputName..[["]])
-							makecaptionfile(tempoutputName)
+							local editcaption = false
+							if config.captionfunction then
+								editcaption = getcaptionfile(filepath)
+							end
+							makecaptionfile(tempoutputName,editcaption,config.captionfunction)
 						end
 					end
 					--pause()
@@ -447,7 +554,11 @@ function splitframes()
 					else
 						os.execute([[copy "]]..filepath..[[" "]]..tempoutputName..[["]])
 					end
-					makecaptionfile(tempoutputName)
+					local editcaption = false
+					if config.captionfunction then
+						editcaption = getcaptionfile(filepath)
+					end
+					makecaptionfile(tempoutputName,editcaption,config.captionfunction)
 				end
 				
 				if madetemp then os.remove(filepath) end

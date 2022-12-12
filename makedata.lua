@@ -33,6 +33,12 @@ function string_findlast(str,pat)
 	end
 	return lastsspot, lastlspot
 end
+function startswith(st,pat)
+	return st:sub(1,#pat) == pat
+end
+function endswith(st,pat)
+	return st:sub(#st-(#pat-1),#st) == pat
+end
 function folderUP(path,num)	
 	num = num or 1
 	local look = string_findlast(path,[[\]])
@@ -296,7 +302,16 @@ cls()
 printset()
 print("Custom width and height (default 512x512, format WIDTHxHEIGHT or WIDTH,HEIGHT)(type a single number for 1:1 aspect ratio)?")
 config.WaH = string.lower((io.read():gsub('"',"")):gsub(" ",""):gsub(",","x"))
-if config.WaH == "avg" then
+if startswith(config.WaH,"crop") then
+	local params = splitstring(config.WaH:sub(#"crop"+1,#config.WaH),"x")
+	config.xpos = tonumber(params[1]) or 1
+	config.ypos = tonumber(params[2]) or 1
+	config.width = tonumber(params[3]) or 512
+	config.height = tonumber(params[4]) or 512
+
+
+
+elseif startswith(config.WaH,"avg") then
 	config.width = {}
 	config.height = {}
 
@@ -407,14 +422,27 @@ function upscaleMediaByPx(imagename,width,height,suffix)
 	os.execute([[ffmpeg -i "]]..imagename..[[" -vf scale=]]..tostring(width)..[[:]]..tostring(height)..[[ -sws_flags lanczos+full_chroma_inp "]]..outputname..[["]])
 	return outputname
 end
+function cropImage(pathtofile,newfilename,xpos,ypos,cwidth,cheight)
+	os.execute([[ffmpeg -i "]]..pathtofile..[[" -vf "crop=]]..tostring(cwidth)..[[:]]..tostring(cheight)..[[:]]..tostring(xpos)..[[:]]..tostring(ypos)..[[" "]]..newfilename..[["]])
+end
 
 function splitframes()
 	
 	local imagecount = 0
 	local imageDimensions = {}
 	local vidw, vidh = false, false
+	local showtimer = os.time()
+	print("Loading image info...")
 	for file in lfs.dir(framesFolder) do
 		if isAllowed(file) then
+			if showtimer ~= os.time() then
+				showtimer = os.time()
+				cls()
+				print("Loading image info...")
+				print("Folder: "..framesFolder)
+				print("images loaded: "..tostring(imagecount))
+			end
+			
 			if isSupportedImage(getEXT(file)) then
 				local filepath = framesFolder.."\\"..file
 				local width, height = vidw, vidh
@@ -429,18 +457,14 @@ function splitframes()
 					width, height = vidw, vidh 
 				end
 				imageDimensions[filepath] = {width, height}
+				imagecount = imagecount+1
 			end
 			
-			if imagecount%5 == 0 then
-				cls()
-				print("Loading image info...")
-				print("Folder: "..framesFolder)
-				print("images loaded: "..tostring(imagecount))
-			end
-			imagecount = imagecount+1
+			
+			
 		end
 	end
-	if config.WaH == "avg" then
+	if startswith(config.WaH,"avg") then
 		local avgx, avgy = 0, 0
 		local total = 0
 		for _,dim in pairs(imageDimensions) do
@@ -473,6 +497,8 @@ function splitframes()
 	local function getcaptionfile(imagefilepath)
 		if config.caption ~= "" then
 			local txtfilepath = imagefilepath:sub(1,#imagefilepath-(#getEXT(imagefilepath))).."txt"
+			--print(txtfilepath)
+			--pause()
 			local captionfile = io.open(txtfilepath,"r")
 			local caption = false
 			if captionfile then
@@ -483,19 +509,19 @@ function splitframes()
 			return caption
 		end
 	end
-	for file in lfs.dir(framesFolder) do
-		if isAllowed(file) then
+	for filepath,imageinfo in pairs(imageDimensions) do
+			
 			if progress%math.ceil(imagecount/1000)==0 then
 				local currenttime = os.time()
 				local percentagecomplete = progress/imagecount
-				local percentpersecond = (percentagecomplete*100)/(currenttime-starttime)
-				local ETA = secondsToReadable((100-(percentagecomplete*100))/percentpersecond)
-				if percentagecomplete < 0.01 or currenttime == starttime then
+				local percentpersecond = (percentagecomplete*1000)/(currenttime-starttime)
+				local ETA = secondsToReadable((1000-(percentagecomplete*1000))/percentpersecond)
+				if percentagecomplete < 0.001 or currenttime-starttime < 5 then
 					ETA = "Calculating..."
 				end
 				stitle("Slicing: "..tostring(math.floor(percentagecomplete*1000)/10).."% ETA: "..ETA)
 			end
-			local filepath = framesFolder.."\\"..file
+			local file = endOfPath(filepath)
 			if lfs.attributes(filepath) and lfs.attributes(filepath).mode == "file" and isSupportedImage(getEXT(file)) then
 				local outputName = framesFolder
 				if config.delimg ~= "y" then
@@ -506,12 +532,7 @@ function splitframes()
 				else
 					outputName = outputName.."\\"..file..".png"
 				end
-				local width, height = false, false
-				if imageDimensions[filepath] then
-					width, height = unpack(imageDimensions[filepath])
-				else
-					width, height = imagedim.GetImageWidthHeight(filepath)
-				end
+				local width, height = unpack(imageinfo)
 				
 				local madetemp = false
 				if (width ~= config.width or height ~= config.height) and (width and height) then
@@ -530,16 +551,34 @@ function splitframes()
 					print(file)
 					print(width,height)
 					--pause()
-					local cells = splitImage(config.width,config.height,width,height)
-					if #cells>1 then
-						for i,cell in ipairs(cells) do
-							local tempoutputName = incrementPathName(outputName)
-							os.execute([[ffmpeg -i "]]..filepath..[[" -vf "crop=]]..tostring(cell.w)..[[:]]..tostring(cell.h)..[[:]]..tostring(cell.x)..[[:]]..tostring(cell.y)..[[" "]]..tempoutputName..[["]])
-							local editcaption = false
-							if config.captionfunction then
-								editcaption = getcaptionfile(filepath)
+					local function sliceImageAndProcessCaption(x,y,w,h)
+						local tempoutputName = incrementPathName(outputName)
+						if w < 1 then
+							w = width+w
+						end
+						if h < 1 then
+							h = height+h
+						end
+						cropImage(filepath,tempoutputName,x,y,w,h)
+						local editcaption = false
+						if config.captionfunction then
+							editcaption = getcaptionfile(madetemp or filepath)
+							--print(file)
+							print(editcaption)
+							--pause()
+						end
+						makecaptionfile(tempoutputName,editcaption,config.captionfunction)
+					end
+					
+					
+					if startswith(config.WaH,"crop") then
+						sliceImageAndProcessCaption(config.xpos,config.ypos,config.width,config.height)
+					else
+						local cells = splitImage(config.width,config.height,width,height)
+						if #cells>1 then
+							for i,cell in ipairs(cells) do
+								sliceImageAndProcessCaption(cell.x,cell.y,cell.w,cell.h)
 							end
-							makecaptionfile(tempoutputName,editcaption,config.captionfunction)
 						end
 					end
 					--pause()
@@ -564,7 +603,7 @@ function splitframes()
 				if madetemp then os.remove(filepath) end
 			end
 			progress = progress+1
-		end
+		
 	end
 end
 local OK, er = pcall(splitframes)

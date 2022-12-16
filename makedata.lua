@@ -277,6 +277,13 @@ if not config.folder then
 	config.removeblur = (io.read():gsub('"',""))
 end
 
+
+
+
+cls()
+printset()
+print("Are all of the images the same size?")
+config.samesize = (io.read():gsub('"',""))
 cls()
 printset()
 print("Add custom file name?")
@@ -426,6 +433,13 @@ function cropImage(pathtofile,newfilename,xpos,ypos,cwidth,cheight)
 	os.execute([[ffmpeg -i "]]..pathtofile..[[" -vf "crop=]]..tostring(cwidth)..[[:]]..tostring(cheight)..[[:]]..tostring(xpos)..[[:]]..tostring(ypos)..[[" "]]..newfilename..[["]])
 end
 
+function repairImage(imagename,suffix)
+	suffix = suffix or "_repaired"
+	local outputname = incrementPathName(concatunderEXT(imagename,suffix))
+	os.execute([[ffmpeg -i "]]..imagename..[[" -vf copy "]]..outputname..[["]])
+	return outputname
+end
+
 function splitframes()
 	
 	local imagecount = 0
@@ -447,10 +461,19 @@ function splitframes()
 				local filepath = framesFolder.."\\"..file
 				local width, height = vidw, vidh
 				
-				if config.folder and not vidw then
+				local function getwidthandheightofimage()
 					width, height = imagedim.GetImageWidthHeight(filepath)
-				elseif not vidw then
-					width, height = imagedim.GetImageWidthHeight(filepath)
+					if not width then
+						local repaired_image = repairImage(filepath)
+						width, height = imagedim.GetImageWidthHeight(repaired_image)
+						os.remove(repaired_image)
+					end
+				end
+				
+				if config.folder and not vidw and config.samesize ~= "y" then
+					getwidthandheightofimage()
+				elseif not vidw and config.samesize == "y" then
+					getwidthandheightofimage()
 					vidw, vidh = width, height
 					
 				else
@@ -554,10 +577,10 @@ function splitframes()
 					local function sliceImageAndProcessCaption(x,y,w,h)
 						local tempoutputName = incrementPathName(outputName)
 						if w < 1 then
-							w = width+w
+							w = (width+w)-x
 						end
 						if h < 1 then
-							h = height+h
+							h = (height+h)-y
 						end
 						cropImage(filepath,tempoutputName,x,y,w,h)
 						local editcaption = false

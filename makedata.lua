@@ -192,6 +192,33 @@ function splitImage(tw,th,ow,oh)
 	end
 	return cells
 end
+
+
+function GPTsplitImage(tw,th,ow,oh)
+    local cells = {}
+    local wsplits = math.ceil(ow/tw)
+    local hsplits = math.ceil(oh/th)
+    for j=0,hsplits-1 do
+        local y = j*th
+        if j>0 then
+            y = y - (th*(j-1))/(hsplits-1)
+        end
+        for i=0,wsplits-1 do
+            local x = i*tw
+            if i>0 then
+                x = x - (tw*(i-1))/(wsplits-1)
+            end
+            local cell = {w=tw, h=th, x=x, y=y}
+            table.insert(cells, cell)
+        end
+    end
+    return cells
+end
+
+
+
+
+
 function splitstring(str,pat)
 	local listowords = {}
 	while str:find(pat) do
@@ -435,7 +462,7 @@ end
 
 function repairImage(imagename,suffix)
 	suffix = suffix or "_repaired"
-	local outputname = incrementPathName(concatunderEXT(imagename,suffix))
+	local outputname = incrementPathName(concatunderEXT(imagename,suffix))..".png"
 	os.execute([[ffmpeg -i "]]..imagename..[[" -vf copy "]]..outputname..[["]])
 	return outputname
 end
@@ -444,6 +471,7 @@ function splitframes()
 	
 	local imagecount = 0
 	local imageDimensions = {}
+	local tempImages = {}
 	local vidw, vidh = false, false
 	local showtimer = os.time()
 	print("Loading image info...")
@@ -460,13 +488,14 @@ function splitframes()
 			if isSupportedImage(getEXT(file)) then
 				local filepath = framesFolder.."\\"..file
 				local width, height = vidw, vidh
-				
+				local repaired_image = false
 				local function getwidthandheightofimage()
 					width, height = imagedim.GetImageWidthHeight(filepath)
-					if not width then
-						local repaired_image = repairImage(filepath)
+					if not width or (width and width > 1024*8) or (height and height > 1024*8) then
+						repaired_image = repairImage(filepath)
 						width, height = imagedim.GetImageWidthHeight(repaired_image)
-						os.remove(repaired_image)
+						--os.remove(repaired_image)
+						table.insert(tempImages,repaired_image)
 					end
 				end
 				
@@ -479,7 +508,7 @@ function splitframes()
 				else
 					width, height = vidw, vidh 
 				end
-				imageDimensions[filepath] = {width, height}
+				imageDimensions[repaired_image or filepath] = {width, height}
 				imagecount = imagecount+1
 			end
 			
@@ -597,7 +626,7 @@ function splitframes()
 					if startswith(config.WaH,"crop") then
 						sliceImageAndProcessCaption(config.xpos,config.ypos,config.width,config.height)
 					else
-						local cells = splitImage(config.width,config.height,width,height)
+						local cells = GPTsplitImage(config.width,config.height,width,height)
 						if #cells>1 then
 							for i,cell in ipairs(cells) do
 								sliceImageAndProcessCaption(cell.x,cell.y,cell.w,cell.h)
@@ -627,6 +656,9 @@ function splitframes()
 			end
 			progress = progress+1
 		
+	end
+	for _,temp in pairs(tempImages) do
+		os.remove(temp)
 	end
 end
 local OK, er = pcall(splitframes)

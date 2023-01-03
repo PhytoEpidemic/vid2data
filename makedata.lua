@@ -151,6 +151,7 @@ function splitframes()
 	local last_image_count = 0
 	local imageDimensions = {}
 	local tempImages = {}
+	local tempImages_processing = {}
 	local vidw, vidh = false, false
 	local showtimer = os.time()
 	print("Loading image info...")
@@ -288,12 +289,18 @@ function splitframes()
 			return caption
 		end
 	end
+	local function delete_tempImages_processing()
+		for i=#tempImages_processing,1,-1 do
+			os.remove(tempImages_processing[i])
+			table.remove(tempImages_processing)
+		end
+	end
 	for filepath,imageinfo in pairs(imageDimensions) do
-			cls()
-			print("Slicing images...")
-			print("Folder: "..framesFolder)
-			print("Workers: "..max_threads)
-			print("Images processed: "..tostring(progress))
+		cls()
+		print("Slicing images...")
+		print("Folder: "..framesFolder)
+		print("Workers: "..max_threads)
+		print("Images processed: "..tostring(progress))
 		if showtimer ~= os.time() then
 			showtimer = os.time()
 			local currenttime = os.time()
@@ -301,7 +308,6 @@ function splitframes()
 			local percentpersecond = (percentagecomplete*1000)/(currenttime-starttime)
 			if last_percentpersecond == 0 then
 				last_percentpersecond = percentpersecond
-				
 			end
 			if config.cfilename == "" then
 				if percentpersecond >= last_percentpersecond then
@@ -343,10 +349,21 @@ function splitframes()
 					end
 					madetemp = filepath
 					filepath = upscaleMediaByPx(filepath,xdiff,ydiff)
+					--local tempnode = parallelism.run(upscaleMediaByPx,{{filepath,xdiff,ydiff}})
+					--local results = tempnode:getResults(true)
+					--for _,r in pairs(results) do
+					--	print(r)
+					--	for _,v in pairs(r) do
+					--		print(v)
+					--	end
+					--end
+					--filepath = results[1][1]
+					--tempnode:cleanUP(true)
+					--tempnode:clear()
 					width, height = imagedim.GetImageWidthHeight(filepath)
 				end
-				--print(file)
-				--print(width,height)
+				print(file)
+				print(width,height)
 				--pause()
 				
 				if startswith(config.WaH,"crop") then
@@ -367,6 +384,7 @@ function splitframes()
 						
 					else
 						processing_node:getResults(true)
+						delete_tempImages_processing()
 						for _,thread in pairs(processing_node.threads) do
 							thread:cleanUP()
 						end
@@ -378,8 +396,10 @@ function splitframes()
 				end
 				--pause()
 				if config.delimg == "y" then
-					os.remove(filepath)
-					if madetemp then os.remove(madetemp) end
+					table.insert(tempImages_processing,filepath)
+					if madetemp then
+						table.insert(tempImages_processing,madetemp)
+					end
 				end
 			elseif (width and height) then
 				local tempoutputName = incrementPathName(outputName)
@@ -395,7 +415,9 @@ function splitframes()
 				makecaptionfile(tempoutputName,editcaption,config)
 			end
 			
-			if madetemp then os.remove(filepath) end
+			if madetemp then
+				table.insert(tempImages_processing,filepath)
+			end
 		end
 		progress = progress+1
 		
@@ -407,6 +429,8 @@ function splitframes()
 	for _,temp in pairs(tempImages) do
 		os.remove(temp)
 	end
+	delete_tempImages_processing()
+	
 end
 local OK, er = pcall(splitframes)
 if not OK then

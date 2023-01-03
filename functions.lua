@@ -340,9 +340,10 @@ function upscaleMedia(imagename,factor,suffix)
 end
 
 function upscaleMediaByPx(imagename,width,height,suffix)
+	--require("functions")
 	suffix = suffix or "_d"..tostring(width)..[[x]]..tostring(height)
 	local outputname = incrementPathName(concatunderEXT(imagename,suffix))
-	exe([[ffmpeg -i "]]..imagename..[[" -vf scale=]]..tostring(width)..[[:]]..tostring(height)..[[ -sws_flags lanczos+full_chroma_inp "]]..outputname..[["]])
+	io.popen([[ffmpeg -i "]]..imagename..[[" -vf scale=]]..tostring(width)..[[:]]..tostring(height)..[[ -sws_flags lanczos+full_chroma_inp "]]..outputname..[[" 2>&1]]):close()
 	return outputname
 end
 function cropImage(pathtofile,newfilename,xpos,ypos,cwidth,cheight)

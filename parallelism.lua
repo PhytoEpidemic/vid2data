@@ -3,72 +3,51 @@ local parallelism = {}
 
 
 function copy_and_verify_file(src, dest)
-  -- Open the source file for reading in binary mode
-  local ok, src_file = pcall(io.open, src, 'rb')
-  if not ok then
-    return false, src_file
-  end
-
-  -- Open the destination file for writing in binary mode
-  local ok, dest_file = pcall(io.open, dest, 'wb')
-  if not ok then
-    src_file:close()
-    return false, dest_file
-  end
-
-  -- Read the contents of the source file in chunks and write them to the destination file
-  while true do
-    local chunk = src_file:read(1024)
-    if chunk == nil then break end
-    dest_file:write(chunk)
-  end
-
-  -- Close both files
-  src_file:close()
-  dest_file:close()
-
-  -- Open the source file and destination file for reading in binary mode
-  ok, src_file = pcall(io.open, src, 'rb')
-  if not ok then
-    return false, src_file
-  end
-  ok, dest_file = pcall(io.open, dest, 'rb')
-  if not ok then
-    src_file:close()
-    return false, dest_file
-  end
-
-  -- Compare the contents of the two files by reading and comparing chunks
-  while true do
-    local src_chunk = src_file:read(1024)
-    local dest_chunk = dest_file:read(1024)
-    if src_chunk ~= dest_chunk then
-      -- The files are different, so delete the destination file and return false
-      src_file:close()
-      dest_file:close()
-	  os.remove(dest)
-      return false, 'File copy verification failed: file contents do not match'
-    end
-    if src_chunk == nil then break end
-  end
-
-  -- Close both files
-  src_file:close()
-  dest_file:close()
-
-  -- The files are the same, so return true
-  return true
+	local ok, src_file = pcall(io.open, src, 'rb')
+	if not ok then
+		return false, src_file
+	end
+	local ok, dest_file = pcall(io.open, dest, 'wb')
+	if not ok then
+		src_file:close()
+		return false, dest_file
+	end
+	while true do
+		local chunk = src_file:read(1024)
+		if chunk == nil then break end
+		dest_file:write(chunk)
+	end
+	src_file:close()
+	dest_file:close()
+	ok, src_file = pcall(io.open, src, 'rb')
+	if not ok then
+		return false, src_file
+	end
+	ok, dest_file = pcall(io.open, dest, 'rb')
+	if not ok then
+		src_file:close()
+		return false, dest_file
+	end
+	while true do
+		local src_chunk = src_file:read(1024)
+		local dest_chunk = dest_file:read(1024)
+		if src_chunk ~= dest_chunk then
+		src_file:close()
+		dest_file:close()
+		os.remove(dest)
+		return false, 'File copy verification failed: file contents do not match'
+		end
+		if src_chunk == nil then break end
+	end
+	src_file:close()
+	dest_file:close()
+	return true
 end
 
 
 function get_temp_file_path()
-  -- Get the path to the default temporary directory
   local temp_dir = os.getenv('TEMP') or os.getenv('TMP') or '.'
-
-  -- Generate a temporary file name using the os.tmpname function
   local temp_name = os.tmpname():gsub("\\",""):gsub("%.","")
-
-  -- Return the full path to the temporary file
   return temp_dir .. "\\" .. temp_name
 end
 
@@ -99,7 +78,6 @@ function folderUP(path,num)
 		else
 			return upafolder
 		end
-		
 	else
 		return ""
 	end
@@ -116,20 +94,14 @@ end
 
 
 function is_executable_running(executable_path)
-  -- Use the `ps -W` command to get a list of all running processes
-  local handle = io.popen("ps -W")
-  local result = handle:read("*a")
-  handle:close()
-
-  -- Split the result into a list of process names
-  local processes = {}
-  for process in string.gmatch(result, "[^\n]+") do
-    processes[(process:sub(65,#process))] = true
-	--print(endOfPath(process:sub(65,#process))== executable_path)
-  end
-	--print(executable_path)
-  -- Check if the executable is in the list of processes
-  return processes[executable_path] == true
+	local handle = io.popen("ps -W")
+	local result = handle:read("*a")
+	handle:close()
+	local processes = {}
+	for process in string.gmatch(result, "[^\n]+") do
+	processes[(process:sub(65,#process))] = true
+	end
+	return processes[executable_path] == true
 end
 
 function table_to_string(t, name, indent)
@@ -289,7 +261,6 @@ end
 
 
 local function splitstring(str,pat)
-
 	local listowords = {}
 	while str:find(pat) do
 		local found, foundend = str:find(pat)
@@ -300,12 +271,10 @@ local function splitstring(str,pat)
 			str = false
 			break
 		end
-
 	end
 	if str then
 		table.insert(listowords,str)
 	end
-
 	return listowords
 end
 
@@ -315,50 +284,30 @@ end
 
 
 local function runCode(code,node)
-	-- Generate a unique file name for the temporary file
 	local tmpFile = os.tmpname():gsub("\\",""):gsub("%.","")
-	-- Write the code to a temporary file
 	local file = assert(io.open(node.tempdir.."\\"..tmpFile .. ".lua", "w"))
-	--print("tofile",code)
 	file:write(code)
 	file:close()
 	local ok,err = copy_and_verify_file("lua.exe", node.tempdir.."\\"..tmpFile..[[.exe]])
 	if not ok then
 		return false, err
 	end
-	-- Generate a command to run the code and redirect the output to the temporary file
-	
 	local command = (space2quote(node.tempdir.."\\"..tmpFile..[[.exe]])..[[ ]]..space2quote(node.tempdir.."\\"..tmpFile..[[.lua]])..[[ 2>&1]])
-	
-	-- Run the command
-	--print(command)
-	
-	
-	
-	-- Return the path to the temporary file
 	return node.tempdir.."\\"..tmpFile, io.popen(command)
 end
 
 local function getVariableNames(code)
-	-- Extract the variable names from the code
 	local variableNames = {}
-
 	local _,fend = code:find("function")
 	local _,pstart = code:find("%(",fend)
 	local _,pend = code:find("%)",pstart)
-	--print("test",code,pstart,pend)
 	local snip = code:sub(pstart+1,pend-1)
 	snup = snip:gsub(" ","")
 	local vars = splitstring(snip,",")
 	for _,var in pairs(vars) do
 		table.insert(variableNames, var)
 	end
-
-
-	for _,n in pairs(variableNames) do
-		--print(n)
-	end
-  return variableNames
+	return variableNames
 end
 
 
@@ -378,50 +327,50 @@ end
 
 
 function extract_required_libraries(script)
-  local required_libraries = {}
-  local balance = 0
-  local library_start, library_end
-  local escape_next_char = false
-  local in_long_form = false
-  local in_interpolation = false
-  local in_comment = false
-  for i = 1, #script do
-    local c = script:sub(i, i)
-    if escape_next_char then
-      escape_next_char = false
-    elseif c == "\\" then
-      escape_next_char = true
-    elseif in_comment then
-      if c == "\n" then
-        in_comment = false
-      end
-    elseif in_long_form then
-      if c == "]" then
-        in_long_form = false
-      end
-    elseif in_interpolation then
-      if c == "}" then
-        in_interpolation = false
-      end
-    elseif c == '"' or c == "'" then
-      if balance == 0 then
-        library_start = i + 1
-      else
-        library_end = i - 1
-        local library_name = script:sub(library_start, library_end)
-        local library_path = searchlib(library_name, package.path)
-        required_libraries[#required_libraries + 1] = library_path
-      end
-      balance = 1 - balance
-    elseif c == "[" then
-      in_long_form = true
-    elseif c == "{" then
-      in_interpolation = true
-    elseif c == "-" and script:sub(i, i + 1) == "--" then
-      in_comment = true
-    end
-  end
-  return required_libraries
+	local required_libraries = {}
+	local balance = 0
+	local library_start, library_end
+	local escape_next_char = false
+	local in_long_form = false
+	local in_interpolation = false
+	local in_comment = false
+	for i = 1, #script do
+		local c = script:sub(i, i)
+		if escape_next_char then
+		escape_next_char = false
+		elseif c == "\\" then
+		escape_next_char = true
+		elseif in_comment then
+		if c == "\n" then
+			in_comment = false
+		end
+		elseif in_long_form then
+		if c == "]" then
+			in_long_form = false
+		end
+		elseif in_interpolation then
+		if c == "}" then
+			in_interpolation = false
+		end
+		elseif c == '"' or c == "'" then
+		if balance == 0 then
+			library_start = i + 1
+		else
+			library_end = i - 1
+			local library_name = script:sub(library_start, library_end)
+			local library_path = searchlib(library_name, package.path)
+			required_libraries[#required_libraries + 1] = library_path
+		end
+		balance = 1 - balance
+		elseif c == "[" then
+		in_long_form = true
+		elseif c == "{" then
+		in_interpolation = true
+		elseif c == "-" and script:sub(i, i + 1) == "--" then
+		in_comment = true
+		end
+	end
+	return required_libraries
 end
 
 
@@ -429,8 +378,6 @@ end
 
 
 local function getFunctionCode(fn)
-  -- Get the debug information for the function
-  
 	local function findvars(fcode)
 		local codestring = false
 		if type(fcode) == "table" then
@@ -448,76 +395,48 @@ local function getFunctionCode(fn)
 		return code, vars
 	end
 	local info = debug.getinfo(fn, "S")
-	
-  -- Check if the function is defined in a file
-  --print(info.source)
-  if info.source:sub(1, 1) == "@" then
-    -- Read the source code of the file
-    local file = assert(io.open(info.source:sub(2), "r"))
-    local source = file:read("*all")
-    file:close()
-
-    -- Extract the code of the function from the source code
-    local lines = {}
-	local alllines = splitstring(source,"\n")
-    local linenum = 1
-	for i,line in ipairs(alllines) do
-		--print(info.linedefined,info.lastlinedefined, linenum, line)
-		if i == info.linedefined then
-
+	if info.source:sub(1, 1) == "@" then
+		local file = assert(io.open(info.source:sub(2), "r"))
+		local source = file:read("*all")
+		file:close()
+		local lines = {}
+		local alllines = splitstring(source,"\n")
+		local linenum = 1
+		for i,line in ipairs(alllines) do
+			if i >= info.linedefined and linenum <= info.lastlinedefined then
+				table.insert(lines, line)
+			end
+			linenum = linenum+1
 		end
-		if i >= info.linedefined and linenum <= info.lastlinedefined then
-			table.insert(lines, line)
-		end
-
-
-	  linenum = linenum+1
-    end
-    return findvars(lines)
-  else
-    -- Return the source of the function if it is not defined in a file
-    return info.source
-  end
+		return findvars(lines)
+	else
+		return info.source
+	end
 end
 
 
 local function swapReturns(code)
-    -- Find the position of the "return" keyword
-    local returnPos, returnPosEnd = code:find("%s(return)%s")
-    if not returnPos then
-        return code:gsub("return_placeholder","return")
-    end
-
-    -- Check if the "return" keyword was found
-    if returnPos then
-        -- Extract the part of the code before the "return" keyword
-        local before = code:sub(1, returnPos - 1)
-
-        -- Extract the part of the code after the "return" keyword
-        local after = code:sub(returnPosEnd + 1)
-        local inside = ""
-        local newlinePos = after:find("\n")
+	local returnPos, returnPosEnd = code:find("%s(return)%s")
+	if not returnPos then
+		return code:gsub("return_placeholder","return")
+	end
+	if returnPos then
+		local before = code:sub(1, returnPos - 1)
+		local after = code:sub(returnPosEnd + 1)
+		local inside = ""
+		local newlinePos = after:find("\n")
 		if not newlinePos then
 			newlinePos = #after+1
 		end
-        if newlinePos then
-            -- There is a newline character after the "return" keyword
-            after = after:sub(newlinePos + 1)
-            inside = code:sub(returnPosEnd + 1, returnPosEnd + newlinePos - 1)
-        end
-
-        -- Trim leading and trailing whitespace from the part of the code after the "return" keyword
-        --after = after:match("^%s*(.-)%s*$")
-
-        -- Check if there are any characters after the "return" keyword
-        
-        -- Build the modified code with the value after the "return" keyword as the argument to "print_table_to_string()"
-        local modifiedCode = before .. "print_table_to_string(" .. inside .. ") return_placeholder\n"..after
-        return swapReturns(modifiedCode)
-    else
-        -- Return the original code if the "return" keyword was not found
-        return code
-    end
+		if newlinePos then
+			after = after:sub(newlinePos + 1)
+			inside = code:sub(returnPosEnd + 1, returnPosEnd + newlinePos - 1)
+		end
+		local modifiedCode = before .. "print_table_to_string(" .. inside .. ") return_placeholder\n"..after
+		return swapReturns(modifiedCode)
+	else
+		return code
+	end
 end
 
 local threadFunctions = {}
@@ -525,22 +444,17 @@ local threadFunctions = {}
 function threadFunctions:isRunning()
 	if is_executable_running(self.processName..".exe") then
 		return true
-	else
-		
+	else	
 		return false
 	end
-	
 end
 
 function threadFunctions:cleanUP()
-	--self:stopThread()
 	os.remove(self.processName..".exe")
 	os.remove(self.processName..".lua")
-
 end
 
 function threadFunctions:stopThread()
-
 	os.execute([[taskkill /F /IM "]]..endOfPath(self.processName)..[[.exe"]])
 end
 
@@ -551,30 +465,25 @@ function threadFunctions:getResults(force)
 	if not force and self:isRunning() then
 		return nil
 	end
-	--print("uh")
 	local result = self.handle:read("*all")
 	self.handle:close()
 	local tmpfile = get_temp_file_path()
 	local tfile = assert(io.open(tmpfile, "w"))
 	tfile:write("local " .. result.." return __table__")
 	tfile:close()
-	
-	
 	local result
-	-- Parse the result from the file
 	local OK, value = pcall(dofile,tmpfile)
 	if OK then
 		result = value
 	else
 		result = value
 	end
-	-- Delete the temporary file
 	os.remove(tmpfile)
 	self.result = result
 	return result
 end
 
---threadFunctions.__index = threadFunctions
+
 local function storeThread(name,handle)
 	local thread = {}
 	thread.handle = handle
@@ -585,7 +494,7 @@ local function storeThread(name,handle)
 			thread[k] = v
 		end
 	end
-	return thread--table.insert(parallelism.threads, thread)
+	return thread
 end
 
 local nodeFunctions = {}
@@ -616,18 +525,12 @@ function nodeFunctions:cleanUP(allthreads)
 	--for _,library_path in pairs(self.libraries) do
 	--	os.remove(self.tempdir.."\\"..library_path)
 	--end
-	
 	os.execute([[rmdir "]]..self.tempdir..[["]])
-	
-	
 end
 
 
 function nodeFunctions:getResults(force)
-
-
 	self.results = self.results or {}
-	
 	for i,thread in ipairs(self.threads) do
 		self.results[i] = self.results[i] or thread:getResults(force)
 	end
@@ -659,7 +562,6 @@ function nodeFunctions:stopThread(num)
 	if not num then
 		self:cleanUP()
 	end
-
 end
 local function makeNode()
 	local node = {}
@@ -680,83 +582,51 @@ end
 local function map(fn, tbl, node)
 	local node = node or makeNode()
 	
-	-- Start a new process for each element in the table
 	local function makeThread(elem)
 		local function prepVar(var,name)
-			
 			local vtype = type(var)
 			if vtype == "table" then
 				var = table_to_string(var, name)	
 			elseif vtype == "string" then
-			
 				var = name.." = ".."[["..var.."]]"
-				
 			else
 				var = name.." = "..tostring(var)
 			end
 			return var
 		end
-		
 		local code, varnames = getFunctionCode(fn)
-		
-		for v,name in ipairs(varnames) do
-		--print(v,name)
-			
-		end
 		if type(elem) == "table" then
-			for j,value in pairs(elem) do
-				
-			end
 			for v,name in ipairs(varnames) do
-	
-				if elem[v] then
-					
-					
-					
+				if elem[v] then	
 					code = "local "..prepVar(elem[v],name).."\n"..code
 	
 				end
 			end
 		elseif type(elem) ~= "table" and elem ~= nil then
-			for n,v in pairs(varnames) do
-				--print(n.." -in- "..v)
-			end
 			if varnames[1] then
 				code = "local "..prepVar(elem,varnames[1]).."\n"..code
-				--print(code)
 			end
-			
 		end
-		
 		--node.libraries = extract_required_libraries(code)
 		--for _,library_path in pairs(node.libraries) do
 		--	--print(lib)
 		--	copy_and_verify_file(library_path, node.tempdir.."\\"..library_path)
 		--end
-		
 		code = swapReturns(code)
 		code = print_table_to_string_code.."\n"..code
-		--print("---------code")
-		--print(code)
-	
 		table.insert(node.threads, storeThread(runCode(code,node)))
 	end
-	if type(tbl) == "table" then
 	
+	if type(tbl) == "table" then
 		for i, elem in ipairs(tbl) do
 			makeThread(elem)
-			
 		end
 	else
 		makeThread(tbl)
 	end
-	
-	
-	
-	
+
 	return node
 end
---print(is_executable_running("lua.exe"))
 
 
 parallelism.run = map

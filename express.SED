@@ -33,11 +33,14 @@ UserQuietInstCmd=
 FILE0="ffmpeg.exe"
 FILE1="lua5.1.dll"
 FILE2="makedata.lua"
-FILE3="lfs.dll"
-FILE4="imagedim.lua"
-FILE5="LICENSE"
-FILE6="vid2data.exe"
-FILE7="lfsaddons.lua"
+FILE3="parallelism.lua"
+FILE4="lfs.dll"
+FILE5="imagedim.lua"
+FILE6="LICENSE"
+FILE7="vid2data.exe"
+FILE8="lua.exe"
+FILE9="lfsaddons.lua"
+FILE10="functions.lua"
 [SourceFiles]
 SourceFiles0=L:\DataProc\vid2data\
 [SourceFiles0]
@@ -49,3 +52,6 @@ SourceFiles0=L:\DataProc\vid2data\
 %FILE5%=
 %FILE6%=
 %FILE7%=
+%FILE8%=
+%FILE9%=
+%FILE10%=

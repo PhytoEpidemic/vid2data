@@ -296,13 +296,16 @@ function splitframes()
 		end
 	end
 	for filepath,imageinfo in pairs(imageDimensions) do
-		cls()
-		print("Slicing images...")
-		print("Folder: "..framesFolder)
-		print("Workers: "..max_threads)
-		print("Images processed: "..tostring(progress))
+		
 		if showtimer ~= os.time() then
 			showtimer = os.time()
+			cls()
+			print("Slicing images...")
+			print("Folder: "..framesFolder)
+			print("Workers: "..max_threads)
+			print("Images processed: "..tostring(math.max(progress-max_threads,0)))
+			
+			
 			local currenttime = os.time()
 			local percentagecomplete = progress/imagecount
 			local percentpersecond = (percentagecomplete*1000)/(currenttime-starttime)
@@ -311,10 +314,10 @@ function splitframes()
 			end
 			if config.cfilename == "" then
 				if percentpersecond >= last_percentpersecond then
-					max_threads = math.min(128,math.ceil(max_threads*1.5))
+					max_threads = math.min(4,math.ceil(max_threads*1.5))
 					
 				else
-					max_threads = math.min(128,math.ceil(max_threads*0.8))
+					max_threads = math.min(4,math.ceil(max_threads*0.8))
 				end
 			end
 			last_percentpersecond = percentpersecond
@@ -362,8 +365,8 @@ function splitframes()
 					--tempnode:clear()
 					width, height = imagedim.GetImageWidthHeight(filepath)
 				end
-				print(file)
-				print(width,height)
+				--print(file)
+				--print(width,height)
 				--pause()
 				
 				if startswith(config.WaH,"crop") then

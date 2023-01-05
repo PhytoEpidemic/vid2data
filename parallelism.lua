@@ -17,6 +17,23 @@ function randomgen.random()
 	return randomgen.state
 end
 
+local function file_exists(path)
+	local file = io.open(path, "rb")
+	if file then
+		file:close()
+		return true
+	end
+	
+	-- File does not exist, but maybe it's a directory.
+	local success, _, code = os.rename(path, path)
+	if success or code == 13 then
+		-- It's a directory or something we can't delete, so it must exist.
+		return true
+	end
+	
+	return false
+end
+
 
 randomgen.seed(os.time())
 
@@ -83,7 +100,11 @@ end
 
 local os_temp_dir = os.getenv('TEMP') or os.getenv('TMP') or '.'
 local function get_temp_file_path()
-  return os_temp_dir .. "\\" .. get_temp_file()
+	local temppath = os_temp_dir .. "\\" .. get_temp_file()
+	if file_exists(temppath) then
+		return get_temp_file_path()
+	end
+	return temppath
 end
 
 

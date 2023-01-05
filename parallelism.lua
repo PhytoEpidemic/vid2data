@@ -1,15 +1,14 @@
 
 local parallelism = {}
--- bit32.band
 
 local randomgen = {}
 randomgen.history = {}
 function randomgen.seed(seed)
-  randomgen.state = seed
+	randomgen.state = seed
 end
 
 function randomgen.release(state)
-  randomgen.history[state] = nil
+	randomgen.history[state] = nil
 end
 
 function randomgen.random()
@@ -22,75 +21,9 @@ end
 randomgen.seed(os.time())
 
 
-function string_findlast(str,pat)
-	local sspot,lspot = str:find(pat)
-	local lastsspot, lastlspot = sspot, lspot
-	while sspot do
-		lastsspot, lastlspot = sspot, lspot
-		sspot, lspot = str:find(pat,lastlspot+1)
-	end
-	return lastsspot, lastlspot
-end
-function startswith(st,pat)
-	return st:sub(1,#pat) == pat
-end
-function endswith(st,pat)
-	return st:sub(#st-(#pat-1),#st) == pat
-end
-function folderUP(path,num)	
-	num = num or 1
-	local look = string_findlast(path,[[\]])
-	if look then 
-		local upafolder = path:sub(1,look-1)
-		if num > 1 then
-			return folderUP(upafolder,num-1)
-		else
-			return upafolder
-		end
-		
-	else
-		return ""
-	end
-end
-
-function endOfPath(f)
-	local prevPath = folderUP(f)
-	local cutspot = #prevPath
-	if cutspot == 0 then
-		cutspot = -1
-	end
-	return f:sub(cutspot+2,#f)
-end
-function makeDir(path)
-	local snip = folderUP(path)
-	local attr = getAttributes(snip)
-	if attr and attr.mode == "directory" then
-	else makeDir(snip)
-	end
-	return lfs.mkdir(path)
-end
-function getEXT(file)
-	local extstart = string_findlast(file,"%.")
-	if extstart then--and extstart > ((file:find("\\")) or 0) then
-		return (file:sub(extstart+1,#file))
-	end
-	return ""
-end
-
-
-
-function concatunderEXT(name,con)
-	local dot = string_findlast(name,"%.")
-	if dot then
-		return (name:sub(1,dot-1))..con..(name:sub(dot,#name))
-	else
-		return name..con
-	end
-end
-
 local incrementHistory = {}
 
-function incrementName(path)
+local function incrementName(path)
 	incrementHistory[path] = incrementHistory[path] or 1
 	local addednumber = ""
 	local numbertotry = incrementHistory[path]
@@ -100,33 +33,31 @@ function incrementName(path)
 	return path..addednumber
 end
 
-function generate_random_filename()
-  local charset = {}  -- table to store the characters in the filename
-  -- populate the `charset` with numbers, uppercase letters, and lowercase letters
-  for i = 48, 57 do  -- ASCII values for digits 0 to 9
-    charset[#charset+1] = string.char(i)
-  end
-  for i = 65, 90 do  -- ASCII values for uppercase letters A to Z
-    charset[#charset+1] = string.char(i)
-  end
-  for i = 97, 122 do  -- ASCII values for lowercase letters a to z
-    charset[#charset+1] = string.char(i)
-  end
-
-
-  -- create the filename by selecting random characters from the `charset`
-  local filename = ""
-  for i = 1, 20 do  -- filename will be 20 characters long
-    local index = math.ceil(randomgen.random()*#charset)  -- select a random index from the `charset`
-    filename = filename .. charset[index]  -- add the character to the filename
-  end
-  return incrementName(filename)
+local function generate_random_filename()
+	local charset = {}  -- table to store the characters in the filename
+	-- populate the `charset` with numbers, uppercase letters, and lowercase letters
+	for i = 48, 57 do  -- ASCII values for digits 0 to 9
+		charset[#charset+1] = string.char(i)
+	end
+	for i = 65, 90 do  -- ASCII values for uppercase letters A to Z
+		charset[#charset+1] = string.char(i)
+	end
+	for i = 97, 122 do  -- ASCII values for lowercase letters a to z
+		charset[#charset+1] = string.char(i)
+	end
+	-- create the filename by selecting random characters from the `charset`
+	local filename = ""
+	for i = 1, 20 do  -- filename will be 20 characters long
+		local index = math.ceil(randomgen.random()*#charset)  -- select a random index from the `charset`
+		filename = filename .. charset[index]  -- add the character to the filename
+	end
+	return incrementName(filename)
 end
 
 
 
 
-function copy_and_verify_file(src, dest)
+local function copy_file(src, dest)
 	local ok, src_file = pcall(io.open, src, 'rb')
 	if not ok then
 		return false, src_file
@@ -143,43 +74,21 @@ function copy_and_verify_file(src, dest)
 	end
 	src_file:close()
 	dest_file:close()
-	--ok, src_file = pcall(io.open, src, 'rb')
-	--if not ok then
-	--	return false, src_file
-	--end
-	--ok, dest_file = pcall(io.open, dest, 'rb')
-	--if not ok then
-	--	src_file:close()
-	--	return false, dest_file
-	--end
-	--while true do
-	--	local src_chunk = src_file:read(1024)
-	--	local dest_chunk = dest_file:read(1024)
-	--	if src_chunk ~= dest_chunk then
-	--	src_file:close()
-	--	dest_file:close()
-	--	os.remove(dest)
-	--	return false, 'File copy verification failed: file contents do not match'
-	--	end
-	--	if src_chunk == nil then break end
-	--end
-	--src_file:close()
-	--dest_file:close()
 	return true
 end
 
-function get_temp_file()
+local function get_temp_file()
 	return generate_random_filename()
-	--return os.tmpname():gsub("\\",""):gsub("%.","")
 end
+
 local os_temp_dir = os.getenv('TEMP') or os.getenv('TMP') or '.'
-function get_temp_file_path()
+local function get_temp_file_path()
   return os_temp_dir .. "\\" .. get_temp_file()
 end
 
 
 
-function string_findlast(str,pat)
+local function string_findlast(str,pat)
 	local sspot,lspot = str:find(pat)
 	local lastsspot, lastlspot = sspot, lspot
 	while sspot do
@@ -188,13 +97,8 @@ function string_findlast(str,pat)
 	end
 	return lastsspot, lastlspot
 end
-function startswith(st,pat)
-	return st:sub(1,#pat) == pat
-end
-function endswith(st,pat)
-	return st:sub(#st-(#pat-1),#st) == pat
-end
-function folderUP(path,num)	
+
+local function folderUP(path,num)	
 	num = num or 1
 	local look = string_findlast(path,[[\]])
 	if look then 
@@ -209,7 +113,7 @@ function folderUP(path,num)
 	end
 end
 
-function endOfPath(f)
+local function endOfPath(f)
 	local prevPath = folderUP(f)
 	local cutspot = #prevPath
 	if cutspot == 0 then
@@ -219,7 +123,7 @@ function endOfPath(f)
 end
 
 
-function is_executable_running(executable_path)
+local function is_executable_running(executable_path)
 	local handle = io.popen("ps -W")
 	local result = handle:read("*a")
 	handle:close()
@@ -230,7 +134,7 @@ function is_executable_running(executable_path)
 	return processes[executable_path] == true
 end
 
-function table_to_string(t, name, indent)
+local function table_to_string(t, name, indent)
 
 	local table_insert = table.insert
 	local table_remove = table.remove
@@ -375,15 +279,7 @@ local print_table_to_string_code = [[local function print_table_to_string(t, nam
 	print( table_concat(cart, "\n"))
 end
 ]]
-function table_save(tab,path)
-	local File = io.open(path, "w")
-	if not File then
-		return false
-	end
-	File:write("local "..table_tostring(tab,"table").."return table")
-	File:close()
-	return true
-end
+
 
 
 local function splitstring(str,pat)
@@ -414,7 +310,7 @@ local function runCode(code,node)
 	local file = assert(io.open(node.tempdir.."\\"..tmpFile .. ".lua", "w"))
 	file:write(code)
 	file:close()
-	local ok,err = copy_and_verify_file("lua.exe", node.tempdir.."\\"..tmpFile..[[.exe]])
+	local ok,err = copy_file("lua.exe", node.tempdir.."\\"..tmpFile..[[.exe]])
 	if not ok then
 		return false, err
 	end
@@ -452,7 +348,7 @@ end
 
 
 
-function extract_required_libraries(script)
+local function extract_required_libraries(script)
 	local required_libraries = {}
 	local balance = 0
 	local library_start, library_end
@@ -593,7 +489,7 @@ function threadFunctions:getResults(force)
 	end
 	local result = self.handle:read("*all")
 	self.handle:close()
-	local tmpfile = get_temp_file_path()
+	local tmpfile = self.node.tempdir.."\\"..get_temp_file()
 	local tfile = assert(io.open(tmpfile, "w"))
 	tfile:write("local " .. result.." return __table__")
 	tfile:close()
@@ -693,7 +589,7 @@ local function makeNode()
 	local node = {}
 	node.tempdir = get_temp_file_path()
 	os.execute([[mkdir "]]..node.tempdir..[["]])
-	copy_and_verify_file("lua5.1.dll", node.tempdir.."\\"..[[lua5.1.dll]])
+	copy_file("lua5.1.dll", node.tempdir.."\\"..[[lua5.1.dll]])
 	node.threads = {}
 	node.__index = node
 	for k,v in pairs(nodeFunctions) do
@@ -736,11 +632,13 @@ local function map(fn, tbl, node)
 		--node.libraries = extract_required_libraries(code)
 		--for _,library_path in pairs(node.libraries) do
 		--	--print(lib)
-		--	copy_and_verify_file(library_path, node.tempdir.."\\"..library_path)
+		--	copy_file(library_path, node.tempdir.."\\"..library_path)
 		--end
 		code = swapReturns(code)
 		code = print_table_to_string_code.."\n"..code
-		table.insert(node.threads, storeThread(runCode(code,node)))
+		local newthread = storeThread(runCode(code,node))
+		newthread.node = node
+		table.insert(node.threads, newthread)
 	end
 	
 	if type(tbl) == "table" then

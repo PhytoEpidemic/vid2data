@@ -326,17 +326,17 @@ local function space2quote(str)
 end
 
 
-local function runCode(code,node)
+local function runCode(code,processing_node)
 	local tmpFile = get_temp_file()
-	local file = assert(io.open(node.tempdir.."\\"..tmpFile .. ".lua", "w"))
+	local file = assert(io.open(processing_node.tempdir.."\\"..tmpFile .. ".lua", "w"))
 	file:write(code)
 	file:close()
-	local ok,err = copy_file("lua.exe", node.tempdir.."\\"..tmpFile..[[.exe]])
+	local ok,err = copy_file("lua.exe", processing_node.tempdir.."\\"..tmpFile..[[.exe]])
 	if not ok then
 		return false, err
 	end
-	local command = (space2quote(node.tempdir.."\\"..tmpFile..[[.exe]])..[[ ]]..space2quote(node.tempdir.."\\"..tmpFile..[[.lua]])..[[ 2>&1]])
-	return node.tempdir.."\\"..tmpFile, io.popen(command)
+	local command = (space2quote(processing_node.tempdir.."\\"..tmpFile..[[.exe]])..[[ ]]..space2quote(processing_node.tempdir.."\\"..tmpFile..[[.lua]])..[[ 2>&1]])
+	return processing_node.tempdir.."\\"..tmpFile, io.popen(command)
 end
 
 local function getVariableNames(code)
@@ -420,7 +420,7 @@ end
 
 
 
-local function getFunctionCode(fn)
+local function getFunctionCode(function_or_string_of_function)
 	local function findvars(fcode)
 		local codestring = false
 		if type(fcode) == "table" then
@@ -433,11 +433,11 @@ local function getFunctionCode(fn)
 		table.remove(fcode,1)
 		return table.concat(fcode, "\n"), vars
 	end
-	local code,vars = findvars(fn)
+	local code,vars = findvars(function_or_string_of_function)
 	if code then
 		return code, vars
 	end
-	local info = debug.getinfo(fn, "S")
+	local info = debug.getinfo(function_or_string_of_function, "S")
 	if info.source:sub(1, 1) == "@" then
 		local file = assert(io.open(info.source:sub(2), "r"))
 		local source = file:read("*all")
@@ -510,7 +510,7 @@ function threadFunctions:getResults(force)
 	end
 	local result = self.handle:read("*all")
 	self.handle:close()
-	local tmpfile = self.node.tempdir.."\\"..get_temp_file()
+	local tmpfile = self.processing_node.tempdir.."\\"..get_temp_file()
 	local tfile = assert(io.open(tmpfile, "w"))
 	tfile:write("local " .. result.." return __table__")
 	tfile:close()
@@ -606,73 +606,72 @@ function nodeFunctions:stopThread(num)
 		self:cleanUP()
 	end
 end
-local function makeNode()
-	local node = {}
-	node.tempdir = get_temp_file_path()
-	os.execute([[mkdir "]]..node.tempdir..[["]])
-	copy_file("lua5.1.dll", node.tempdir.."\\"..[[lua5.1.dll]])
-	node.threads = {}
-	node.__index = node
+local function make_processing_node()
+	local processing_node = {}
+	processing_node.tempdir = get_temp_file_path()
+	os.execute([[mkdir "]]..processing_node.tempdir..[["]])
+	copy_file("lua5.1.dll", processing_node.tempdir.."\\"..[[lua5.1.dll]])
+	processing_node.threads = {}
+	processing_node.__index = processing_node
 	for k,v in pairs(nodeFunctions) do
-		if node[k] == nil then
-			node[k] = v
+		if processing_node[k] == nil then
+			processing_node[k] = v
 		end
 	end
-	return node
+	return processing_node
 end
 
 
-local function map(fn, tbl, node)
-	local node = node or makeNode()
+function parallelism.run(function_or_string_of_function, params_to_pass, processing_node)
+	local processing_node = processing_node or make_processing_node()
 	
-	local function makeThread(elem)
-		local function prepVar(var,name)
-			local vtype = type(var)
+	local function makeThread(pass_to_thread)
+		local function format_variable(value,variable_name)
+			local vtype = type(value)
+			local formatted_variable = "local "
 			if vtype == "table" then
-				var = table_to_string(var, name)	
+				formatted_variable = formatted_variable..table_to_string(value, variable_name)	
 			elseif vtype == "string" then
-				var = name.." = ".."[["..var.."]]"
+				formatted_variable = formatted_variable..variable_name.." = ".."[["..value.."]]"
 			else
-				var = name.." = "..tostring(var)
+				formatted_variable = formatted_variable..variable_name.." = "..tostring(value)
 			end
-			return var
+			return formatted_variable
 		end
-		local code, varnames = getFunctionCode(fn)
-		if type(elem) == "table" then
-			for v,name in ipairs(varnames) do
-				if elem[v] then	
-					code = "local "..prepVar(elem[v],name).."\n"..code
-	
+		local code_to_run, function_params = getFunctionCode(function_or_string_of_function)
+		if type(pass_to_thread) == "table" then
+			for param_index,variable_name in ipairs(function_params) do
+				if pass_to_thread[param_index] then	
+					code_to_run = format_variable(pass_to_thread[param_index],variable_name).."\n"..code_to_run
 				end
 			end
-		elseif type(elem) ~= "table" and elem ~= nil then
-			if varnames[1] then
-				code = "local "..prepVar(elem,varnames[1]).."\n"..code
+		elseif type(pass_to_thread) ~= "table" and pass_to_thread ~= nil then
+			if function_params[1] then
+				code_to_run = format_variable(pass_to_thread,function_params[1]).."\n"..code_to_run
 			end
 		end
-		--node.libraries = extract_required_libraries(code)
-		--for _,library_path in pairs(node.libraries) do
+		--processing_node.libraries = extract_required_libraries(code_to_run)
+		--for _,library_path in pairs(processing_node.libraries) do
 		--	--print(lib)
-		--	copy_file(library_path, node.tempdir.."\\"..library_path)
+		--	copy_file(library_path, processing_node.tempdir.."\\"..library_path)
 		--end
-		code = swapReturns(code)
-		code = print_table_to_string_code.."\n"..code
-		local newthread = storeThread(runCode(code,node))
-		newthread.node = node
-		table.insert(node.threads, newthread)
+		code_to_run = swapReturns(code_to_run)
+		code_to_run = print_table_to_string_code.."\n"..code_to_run
+		local newthread = storeThread(runCode(code_to_run,processing_node))
+		newthread.processing_node = processing_node
+		table.insert(processing_node.threads, newthread)
 	end
 	
-	if type(tbl) == "table" then
-		for i, elem in ipairs(tbl) do
+	if type(params_to_pass) == "table" then
+		for _, elem in ipairs(params_to_pass) do
 			makeThread(elem)
 		end
 	else
-		makeThread(tbl)
+		makeThread(params_to_pass)
 	end
 
-	return node
+	return processing_node
 end
 
 
-parallelism.run = map
 return parallelism

@@ -1,5 +1,129 @@
 
 local parallelism = {}
+-- bit32.band
+
+local randomgen = {}
+randomgen.history = {}
+function randomgen.seed(seed)
+  randomgen.state = seed
+end
+
+function randomgen.release(state)
+  randomgen.history[state] = nil
+end
+
+function randomgen.random()
+	local x = math.sin(randomgen.state) * 10000
+	randomgen.state = x - math.floor(x)	
+	return randomgen.state
+end
+
+
+randomgen.seed(os.time())
+
+
+function string_findlast(str,pat)
+	local sspot,lspot = str:find(pat)
+	local lastsspot, lastlspot = sspot, lspot
+	while sspot do
+		lastsspot, lastlspot = sspot, lspot
+		sspot, lspot = str:find(pat,lastlspot+1)
+	end
+	return lastsspot, lastlspot
+end
+function startswith(st,pat)
+	return st:sub(1,#pat) == pat
+end
+function endswith(st,pat)
+	return st:sub(#st-(#pat-1),#st) == pat
+end
+function folderUP(path,num)	
+	num = num or 1
+	local look = string_findlast(path,[[\]])
+	if look then 
+		local upafolder = path:sub(1,look-1)
+		if num > 1 then
+			return folderUP(upafolder,num-1)
+		else
+			return upafolder
+		end
+		
+	else
+		return ""
+	end
+end
+
+function endOfPath(f)
+	local prevPath = folderUP(f)
+	local cutspot = #prevPath
+	if cutspot == 0 then
+		cutspot = -1
+	end
+	return f:sub(cutspot+2,#f)
+end
+function makeDir(path)
+	local snip = folderUP(path)
+	local attr = getAttributes(snip)
+	if attr and attr.mode == "directory" then
+	else makeDir(snip)
+	end
+	return lfs.mkdir(path)
+end
+function getEXT(file)
+	local extstart = string_findlast(file,"%.")
+	if extstart then--and extstart > ((file:find("\\")) or 0) then
+		return (file:sub(extstart+1,#file))
+	end
+	return ""
+end
+
+
+
+function concatunderEXT(name,con)
+	local dot = string_findlast(name,"%.")
+	if dot then
+		return (name:sub(1,dot-1))..con..(name:sub(dot,#name))
+	else
+		return name..con
+	end
+end
+
+local incrementHistory = {}
+
+function incrementName(path)
+	incrementHistory[path] = incrementHistory[path] or 1
+	local addednumber = ""
+	local numbertotry = incrementHistory[path]
+	numbertotry = numbertotry+1
+	addednumber = tostring(numbertotry)
+	incrementHistory[path] = numbertotry
+	return path..addednumber
+end
+
+function generate_random_filename()
+  local charset = {}  -- table to store the characters in the filename
+  -- populate the `charset` with numbers, uppercase letters, and lowercase letters
+  for i = 48, 57 do  -- ASCII values for digits 0 to 9
+    charset[#charset+1] = string.char(i)
+  end
+  for i = 65, 90 do  -- ASCII values for uppercase letters A to Z
+    charset[#charset+1] = string.char(i)
+  end
+  for i = 97, 122 do  -- ASCII values for lowercase letters a to z
+    charset[#charset+1] = string.char(i)
+  end
+
+
+  -- create the filename by selecting random characters from the `charset`
+  local filename = ""
+  for i = 1, 20 do  -- filename will be 20 characters long
+    local index = math.ceil(randomgen.random()*#charset)  -- select a random index from the `charset`
+    filename = filename .. charset[index]  -- add the character to the filename
+  end
+  return incrementName(filename)
+end
+
+
 
 
 function copy_and_verify_file(src, dest)
@@ -19,36 +143,38 @@ function copy_and_verify_file(src, dest)
 	end
 	src_file:close()
 	dest_file:close()
-	ok, src_file = pcall(io.open, src, 'rb')
-	if not ok then
-		return false, src_file
-	end
-	ok, dest_file = pcall(io.open, dest, 'rb')
-	if not ok then
-		src_file:close()
-		return false, dest_file
-	end
-	while true do
-		local src_chunk = src_file:read(1024)
-		local dest_chunk = dest_file:read(1024)
-		if src_chunk ~= dest_chunk then
-		src_file:close()
-		dest_file:close()
-		os.remove(dest)
-		return false, 'File copy verification failed: file contents do not match'
-		end
-		if src_chunk == nil then break end
-	end
-	src_file:close()
-	dest_file:close()
+	--ok, src_file = pcall(io.open, src, 'rb')
+	--if not ok then
+	--	return false, src_file
+	--end
+	--ok, dest_file = pcall(io.open, dest, 'rb')
+	--if not ok then
+	--	src_file:close()
+	--	return false, dest_file
+	--end
+	--while true do
+	--	local src_chunk = src_file:read(1024)
+	--	local dest_chunk = dest_file:read(1024)
+	--	if src_chunk ~= dest_chunk then
+	--	src_file:close()
+	--	dest_file:close()
+	--	os.remove(dest)
+	--	return false, 'File copy verification failed: file contents do not match'
+	--	end
+	--	if src_chunk == nil then break end
+	--end
+	--src_file:close()
+	--dest_file:close()
 	return true
 end
 
-
+function get_temp_file()
+	return generate_random_filename()
+	--return os.tmpname():gsub("\\",""):gsub("%.","")
+end
+local os_temp_dir = os.getenv('TEMP') or os.getenv('TMP') or '.'
 function get_temp_file_path()
-  local temp_dir = os.getenv('TEMP') or os.getenv('TMP') or '.'
-  local temp_name = os.tmpname():gsub("\\",""):gsub("%.","")
-  return temp_dir .. "\\" .. temp_name
+  return os_temp_dir .. "\\" .. get_temp_file()
 end
 
 
@@ -284,7 +410,7 @@ end
 
 
 local function runCode(code,node)
-	local tmpFile = os.tmpname():gsub("\\",""):gsub("%.","")
+	local tmpFile = get_temp_file()
 	local file = assert(io.open(node.tempdir.."\\"..tmpFile .. ".lua", "w"))
 	file:write(code)
 	file:close()

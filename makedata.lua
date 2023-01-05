@@ -209,6 +209,10 @@ function splitframes()
 				local filepath = framesFolder.."\\"..file
 				local width, height = vidw, vidh
 				local repaired_image = false
+				local function add_image_to_list()
+					imageDimensions[repaired_image or filepath] = {width, height}
+					imagecount = imagecount+1
+				end
 				local function getwidthandheightofimage(thefilepath)
 					if thefilepath then
 						require("functions")
@@ -226,23 +230,26 @@ function splitframes()
 				end
 				
 				if config.folder and not vidw and config.samesize ~= "y" then
-					if (processing_node and #processing_node.threads < max_threads) or not processing_node then
-						processing_node = parallelism.run(getwidthandheightofimage,{filepath},processing_node)
+					if getEXT(file) == "png" then
+						getwidthandheightofimage()
+						add_image_to_list()
 					else
-						getResults()
-						processing_node = parallelism.run(getwidthandheightofimage,{filepath},processing_node)
-					end
 					
+					
+						if (processing_node and #processing_node.threads < max_threads) or not processing_node then
+							processing_node = parallelism.run(getwidthandheightofimage,{filepath},processing_node)
+						else
+							getResults()
+							processing_node = parallelism.run(getwidthandheightofimage,{filepath},processing_node)
+						end
+					end
 				elseif not vidw and config.samesize == "y" then
 					getwidthandheightofimage()
 					vidw, vidh = width, height
-					
-				else
-					width, height = vidw, vidh 
-				end
-				if not processing_node then
-					imageDimensions[repaired_image or filepath] = {width, height}
-					imagecount = imagecount+1
+					add_image_to_list()
+				elseif vidw then
+					width, height = vidw, vidh
+					add_image_to_list()
 				end
 				
 			end
@@ -375,6 +382,7 @@ function splitframes()
 					local function imagesplitloop(config,width,height,outputName,filepath)
 						require("functions")
 						local cells = GPTsplitImage(config.width,config.height,width,height)
+						
 						if #cells>1 then
 							for i,cell in ipairs(cells) do
 								sliceImageAndProcessCaption(cell.x,cell.y,cell.w,cell.h,config,outputName,width,height,filepath)
@@ -386,7 +394,11 @@ function splitframes()
 						processing_node = parallelism.run(imagesplitloop,{{config,width,height,outputName,filepath}},processing_node)
 						
 					else
-						processing_node:getResults(true)
+						local results = processing_node:getResults(true)
+						--for _,result in ipairs(results) do
+						--	print(result)
+						--	pause()
+						--end
 						delete_tempImages_processing()
 						for _,thread in pairs(processing_node.threads) do
 							thread:cleanUP()

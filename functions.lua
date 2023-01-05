@@ -357,24 +357,21 @@ function repairImage(imagename,suffix)
 	return outputname
 end
 
-function sliceImageAndProcessCaption(x,y,w,h,config,outputName,width,height,filepath)
-	local tempoutputName = incrementPathName(outputName)
-	if w < 1 then
-		w = (width+w)-x
+function getcaptionfile(imagefilepath,config)
+		if config.caption ~= "" then
+			local txtfilepath = imagefilepath:sub(1,#imagefilepath-(#getEXT(imagefilepath))).."txt"
+			--print(txtfilepath)
+			--pause()
+			local captionfile = io.open(txtfilepath,"r")
+			local caption = false
+			if captionfile then
+				caption = captionfile:read("*all")
+				captionfile:close()
+			end
+			
+			return caption
+		end
 	end
-	if h < 1 then
-		h = (height+h)-y
-	end
-	cropImage(filepath,tempoutputName,x,y,w,h)
-	local editcaption = false
-	if config.captionfunction then
-		editcaption = getcaptionfile(madetemp or filepath)
-		--print(file)
-		--print(editcaption)
-		--pause()
-	end
-	makecaptionfile(tempoutputName,editcaption,config)
-end
 
 function makecaptionfile(imagefilepath,caption,config)
 	if config.caption ~= "" then
@@ -393,3 +390,23 @@ function makecaptionfile(imagefilepath,caption,config)
 		captionfile:close()
 	end
 end
+
+function sliceImageAndProcessCaption(x,y,w,h,config,outputName,width,height,filepath)
+	local tempoutputName = incrementPathName(outputName)
+	if w < 1 then
+		w = (width+w)-x
+	end
+	if h < 1 then
+		h = (height+h)-y
+	end
+	cropImage(filepath,tempoutputName,x,y,w,h)
+	local editcaption = false
+	if config.captionfunction then
+		editcaption = getcaptionfile(filepath,config)
+		--print(file)
+		--print(editcaption)
+		--pause()
+	end
+	makecaptionfile(tempoutputName,editcaption,config)
+end
+

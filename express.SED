@@ -3,7 +3,7 @@ Class=IEXPRESS
 SEDVersion=3
 [Options]
 PackagePurpose=InstallApp
-ShowInstallProgramWindow=0
+ShowInstallProgramWindow=1
 HideExtractAnimation=1
 UseLongFileName=1
 InsideCompressed=0
@@ -26,7 +26,7 @@ DisplayLicense=
 FinishMessage=
 TargetName=L:\DataProc\vid2data.exe
 FriendlyName=t
-AppLaunched=vid2data.exe makedata.lua
+AppLaunched=cmd /c runGUI.bat /MIN
 PostInstallCmd=<None>
 AdminQuietInstCmd=
 UserQuietInstCmd=
@@ -41,6 +41,10 @@ FILE7="vid2data.exe"
 FILE8="lua.exe"
 FILE9="lfsaddons.lua"
 FILE10="functions.lua"
+FILE11="GUI.ps1"
+FILE12="vid2dataGUI.exe"
+FILE13="logo.ico"
+FILE14="runGUI.bat"
 [SourceFiles]
 SourceFiles0=L:\DataProc\vid2data\
 [SourceFiles0]
@@ -55,3 +59,7 @@ SourceFiles0=L:\DataProc\vid2data\
 %FILE8%=
 %FILE9%=
 %FILE10%=
+%FILE11%=
+%FILE12%=
+%FILE13%=
+%FILE14%=

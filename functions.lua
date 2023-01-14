@@ -13,7 +13,31 @@ function rtitle()
 end
 function cls()
 	exe("cls")
+	io.open("processinfo.txt", "w"):close()
 end
+-- Define the function
+function printout(...)
+    -- Open the file in append mode
+    local file = io.open("processinfo.txt", "a")
+
+    -- Convert the arguments to a string
+    local args = {...}
+    local str = table.concat(args, "\t")
+
+    -- Write the string to the file
+    file:write(str .. "\n")
+
+    -- Close the file
+    file:close()
+	print(...)
+end
+
+function set_progress(progress)
+    local file = io.open("progress.txt", "w")
+    file:write(progress)
+    file:close()
+end
+
 function pause()
 	exe("pause")
 end
@@ -159,61 +183,119 @@ function padNum(str)
 	return (fulldigits:sub(#str+1,#fulldigits))..str
 end
 
-function splitImage(tw,th,ow,oh)
+--function splitImage(tw,th,ow,oh)
+--	local cells = {}
+--	local wsplits = ow/tw
+--	local wfull = math.floor(wsplits)
+--	local wextra = 1-(wsplits-wfull)
+--	local wpadding = (tw*wextra)/wfull
+--	local hsplits = oh/th
+--	local hfull = math.floor(hsplits)
+--	local hextra = 1-(hsplits-hfull)
+--	local hpadding = (th*hextra)/hfull
+--	if wsplits == 1 then
+--		wfull = 0
+--	end
+--	if hsplits == 1 then
+--		hfull = 0
+--	end
+--	for i=0,wfull do
+--		for j=0,hfull do
+--			local cell = {}
+--			cell.w = tw
+--			cell.h = th
+--			cell.x = i*tw
+--			if i>0 then
+--				cell.x = cell.x-wpadding*(i)
+--			end
+--			cell.y = j*th
+--			if j>0 then
+--				cell.y = cell.y-hpadding*(j)
+--			end
+--			table.insert(cells,cell)
+--		end
+--	end
+--	return cells
+--end
+--
+--
+--function GPTsplitImage(tw,th,ow,oh)
+--    local cells = {}
+--    local wsplits = math.ceil(ow/tw)
+--    local hsplits = math.ceil(oh/th)
+--    for j=0,hsplits-1 do
+--        local y = j*th
+--        if j>0 then
+--            y = y - (th*(j-1))/(hsplits-1)
+--        end
+--        for i=0,wsplits-1 do
+--            local x = i*tw
+--            if i>0 then
+--                x = x - (tw*(i-1))/(wsplits-1)
+--            end
+--            local cell = {w=tw, h=th, x=x, y=y}
+--            table.insert(cells, cell)
+--        end
+--    end
+--    return cells
+--end
+--
+--function get_cells(target_w, target_h, orig_w, orig_h)
+--    local cells = {}
+--    local x, y = 0, 0
+--    local w, h = target_w, target_h
+--	local wsplits = orig_w/target_w
+--	local wfull = math.floor(wsplits)
+--	local wextra = (wsplits-wfull)
+--	local hsplits = orig_h/target_h
+--	local hfull = math.floor(hsplits)
+--	local hextra = (hsplits-hfull)
+--    -- calculate the overlap
+--    local overlap_x = w * wextra
+--    local overlap_y = h * hextra
+--    w = w - overlap_x
+--    h = h - overlap_y
+--
+--    while y < orig_h do
+--        while x < orig_w do
+--            table.insert(cells, {x=x, y=y, w=w, h=h})
+--            x = x + w - overlap_x
+--        end
+--        x = 0
+--        y = y + h - overlap_y
+--    end
+--
+--    return cells
+--end
+
+function get_cells(target_w, target_h, orig_w, orig_h)
 	local cells = {}
-	local wsplits = ow/tw
+	local x, y = 0, 0
+	local wsplits = orig_w/target_w
 	local wfull = math.floor(wsplits)
-	local wextra = 1-(wsplits-wfull)
-	local wpadding = (tw*wextra)/wfull
-	local hsplits = oh/th
+	local wextra = (wsplits-wfull)
+	local hsplits = orig_h/target_h
 	local hfull = math.floor(hsplits)
-	local hextra = 1-(hsplits-hfull)
-	local hpadding = (th*hextra)/hfull
-	if wsplits == 1 then
-		wfull = 0
-	end
-	if hsplits == 1 then
-		hfull = 0
-	end
-	for i=0,wfull do
-		for j=0,hfull do
-			local cell = {}
-			cell.w = tw
-			cell.h = th
-			cell.x = i*tw
-			if i>0 then
-				cell.x = cell.x-wpadding*(i)
+	local hextra = (hsplits-hfull)
+	local overlap_x = (wextra*target_w) / wfull
+	local overlap_y = (hextra*target_h) / hfull
+	--printout(target_w, target_h, orig_w, orig_h)
+	while y+target_h <= orig_h do
+		while x+target_w <= orig_w do
+			table.insert(cells, {x=x, y=y, w=target_w, h=target_h})
+			--printout(x,y,overlap_x,overlap_y)
+			if overlap_x == 0 then
+				break
 			end
-			cell.y = j*th
-			if j>0 then
-				cell.y = cell.y-hpadding*(j)
-			end
-			table.insert(cells,cell)
+			x = x + overlap_x
 		end
+		if overlap_y == 0 then
+			break
+		end
+		x = 0
+		y = y + overlap_y
 	end
 	return cells
-end
-
-
-function GPTsplitImage(tw,th,ow,oh)
-    local cells = {}
-    local wsplits = math.ceil(ow/tw)
-    local hsplits = math.ceil(oh/th)
-    for j=0,hsplits-1 do
-        local y = j*th
-        if j>0 then
-            y = y - (th*(j-1))/(hsplits-1)
-        end
-        for i=0,wsplits-1 do
-            local x = i*tw
-            if i>0 then
-                x = x - (tw*(i-1))/(wsplits-1)
-            end
-            local cell = {w=tw, h=th, x=x, y=y}
-            table.insert(cells, cell)
-        end
-    end
-    return cells
 end
 
 
@@ -222,6 +304,7 @@ end
 
 function splitstring(str,pat)
 	local listowords = {}
+	
 	while str:find(pat) do
 		local found, foundend = str:find(pat)
 		table.insert(listowords,str:sub(1,found-1))
@@ -233,6 +316,7 @@ function splitstring(str,pat)
 		end
 		
 	end
+	
 	if str then
 		table.insert(listowords,str)
 	end
@@ -243,15 +327,15 @@ end
 
 function printsettingstosconsole(config)
 	if not config.folder then
-		print("Selected Video: "..(config.vfile or "none"))
-		print("Key frames only: "..(config.keyframesonly or "n"))
-		print("Remove blurred frames: "..(config.removeblur or "n"))
+		print("Selected Video: "..tostring(config.vfile or "none"))
+		print("Key frames only: "..tostring(config.keyframesonly or "n"))
+		print("Remove blurred frames: "..tostring(config.removeblur or "n"))
 	else
-		print("Selected Folder: "..(config.vfile or "none"))
+		print("Selected Folder: "..tostring(config.vfile or "none"))
 	end
-	print("Custom name: "..(config.cfilename or "none"))
-	print("Custom caption: "..(config.caption or "none"))
-	print("Delete after slicing: "..(config.delimg or "n"))
+	print("Custom name: "..tostring(config.cfilename or "none"))
+	print("Custom caption: "..tostring(config.caption or "none"))
+	print("Delete after slicing: "..tostring(config.delimg or "n"))
 	if config.WaH then
 		if type(config.width) == "number" then
 			print("Output width and height: "..tostring(config.width).."x"..tostring(config.height))
@@ -289,7 +373,7 @@ end
 
 
 local function removeBlur(config)
-	if config.removeblur == "y" then
+	if tonumber(config.removeblur) then
 		local blurlogf = io.open("log.txt","r")
 		local framec = "0"
 		local blur = "0"

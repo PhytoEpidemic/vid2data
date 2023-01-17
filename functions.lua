@@ -15,22 +15,27 @@ function cls()
 	exe("cls")
 	io.open("processinfo.txt", "w"):close()
 end
--- Define the function
 function printout(...)
-    -- Open the file in append mode
-    local file = io.open("processinfo.txt", "a")
-
-    -- Convert the arguments to a string
-    local args = {...}
-    local str = table.concat(args, "\t")
-
-    -- Write the string to the file
-    file:write(str .. "\n")
-
-    -- Close the file
-    file:close()
+	local file = io.open("processinfo.txt", "a")
+	
+	file:write(table.concat({...}, "\t") .. "\n")
+	file:close()
+	
 	print(...)
 end
+function clearExecutableList()
+	io.open("runningProcesses.txt", "w"):close()
+end
+function addToExecutableList(executable_name)
+	local file = io.open("runningProcesses.txt", "a")
+	
+	file:write(executable_name .. "\n")
+	file:close()
+	
+	print(executable_name)
+end
+
+
 
 function set_progress(progress)
     local file = io.open("progress.txt", "w")
@@ -183,120 +188,44 @@ function padNum(str)
 	return (fulldigits:sub(#str+1,#fulldigits))..str
 end
 
---function splitImage(tw,th,ow,oh)
---	local cells = {}
---	local wsplits = ow/tw
---	local wfull = math.floor(wsplits)
---	local wextra = 1-(wsplits-wfull)
---	local wpadding = (tw*wextra)/wfull
---	local hsplits = oh/th
---	local hfull = math.floor(hsplits)
---	local hextra = 1-(hsplits-hfull)
---	local hpadding = (th*hextra)/hfull
---	if wsplits == 1 then
---		wfull = 0
---	end
---	if hsplits == 1 then
---		hfull = 0
---	end
---	for i=0,wfull do
---		for j=0,hfull do
---			local cell = {}
---			cell.w = tw
---			cell.h = th
---			cell.x = i*tw
---			if i>0 then
---				cell.x = cell.x-wpadding*(i)
---			end
---			cell.y = j*th
---			if j>0 then
---				cell.y = cell.y-hpadding*(j)
---			end
---			table.insert(cells,cell)
---		end
---	end
---	return cells
---end
---
---
---function GPTsplitImage(tw,th,ow,oh)
---    local cells = {}
---    local wsplits = math.ceil(ow/tw)
---    local hsplits = math.ceil(oh/th)
---    for j=0,hsplits-1 do
---        local y = j*th
---        if j>0 then
---            y = y - (th*(j-1))/(hsplits-1)
---        end
---        for i=0,wsplits-1 do
---            local x = i*tw
---            if i>0 then
---                x = x - (tw*(i-1))/(wsplits-1)
---            end
---            local cell = {w=tw, h=th, x=x, y=y}
---            table.insert(cells, cell)
---        end
---    end
---    return cells
---end
---
---function get_cells(target_w, target_h, orig_w, orig_h)
---    local cells = {}
---    local x, y = 0, 0
---    local w, h = target_w, target_h
---	local wsplits = orig_w/target_w
---	local wfull = math.floor(wsplits)
---	local wextra = (wsplits-wfull)
---	local hsplits = orig_h/target_h
---	local hfull = math.floor(hsplits)
---	local hextra = (hsplits-hfull)
---    -- calculate the overlap
---    local overlap_x = w * wextra
---    local overlap_y = h * hextra
---    w = w - overlap_x
---    h = h - overlap_y
---
---    while y < orig_h do
---        while x < orig_w do
---            table.insert(cells, {x=x, y=y, w=w, h=h})
---            x = x + w - overlap_x
---        end
---        x = 0
---        y = y + h - overlap_y
---    end
---
---    return cells
---end
 
-function get_cells(target_w, target_h, orig_w, orig_h)
+
+function get_cells(target_w, target_h, orig_w, orig_h, crop_tolerance)
+	crop_tolerance = crop_tolerance or 32
 	local cells = {}
 	local x, y = 0, 0
 	local wsplits = orig_w/target_w
 	local wfull = math.floor(wsplits)
-	local wextra = (wsplits-wfull)
+	local wextra = 1-(wsplits-wfull)
 	local hsplits = orig_h/target_h
 	local hfull = math.floor(hsplits)
-	local hextra = (hsplits-hfull)
-	local overlap_x = (wextra*target_w) / wfull
-	local overlap_y = (hextra*target_h) / hfull
+	local hextra = 1-(hsplits-hfull)
+	local overlap_x = (((wextra)*target_w))*(0.5)
+	local overlap_y = (((hextra)*target_h))*(0.5)
 	--printout(target_w, target_h, orig_w, orig_h)
-	while y+target_h <= orig_h do
-		while x+target_w <= orig_w do
-			table.insert(cells, {x=x, y=y, w=target_w, h=target_h})
+	for _=1, math.ceil(hsplits) do
+		for _=1,math.ceil(wsplits) do
+			table.insert(cells, {x=math.min(orig_w-target_w,math.max(0,x-overlap_x)), y=math.min(orig_h-target_h,math.max(0,y-overlap_y)), w=target_w, h=target_h})
 			--printout(x,y,overlap_x,overlap_y)
-			if overlap_x == 0 then
+			if (target_w-overlap_x*2 < crop_tolerance and wfull == 1) then
 				break
 			end
-			x = x + overlap_x
+			
+			x = x + (target_w)
 		end
-		if overlap_y == 0 then
+		if (target_h-overlap_y*2 < crop_tolerance and hfull == 1) then
 			break
 		end
 		x = 0
-		y = y + overlap_y
+		y = y + (target_h)
+	end
+	if #cells == 1 then
+		cells[1]["x"] = math.floor(orig_w*0.5-target_w*0.5)
+		cells[1]["y"] = math.floor(orig_h*0.5-target_h*0.5)
 	end
 	return cells
 end
+
 
 
 

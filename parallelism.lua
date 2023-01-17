@@ -3,10 +3,12 @@ local parallelism = {}
 
 local randomgen = {}
 randomgen.history = {}
+
+
 function randomgen.seed(seed)
 	randomgen.state = seed
 end
-
+randomgen.seed(os.time())
 function randomgen.release(state)
 	randomgen.history[state] = nil
 end
@@ -33,9 +35,33 @@ local function file_exists(path)
 	
 	return false
 end
+function string_findlast(str,pat)
+	local sspot,lspot = str:find(pat)
+	local lastsspot, lastlspot = sspot, lspot
+	while sspot do
+		lastsspot, lastlspot = sspot, lspot
+		sspot, lspot = str:find(pat,lastlspot+1)
+	end
+	return lastsspot, lastlspot
+end
+function getEXT(file)
+	local extstart = string_findlast(file,"%.")
+	if extstart then--and extstart > ((file:find("\\")) or 0) then
+		return (file:sub(extstart+1,#file))
+	end
+	return ""
+end
+function concatunderEXT(name,con)
+	local dot = string_findlast(name,"%.")
+	if dot then
+		return (name:sub(1,dot-1))..con..(name:sub(dot,#name))
+	else
+		return name..con
+	end
+end
 
 
-randomgen.seed(os.time())
+
 
 
 local incrementHistory = {}
@@ -150,7 +176,7 @@ local function is_executable_running(executable_path)
 	handle:close()
 	local processes = {}
 	for process in string.gmatch(result, "[^\n]+") do
-	processes[(process:sub(65,#process))] = true
+		processes[(process:sub(65,#process))] = true
 	end
 	return processes[executable_path] == true
 end
@@ -326,18 +352,6 @@ local function space2quote(str)
 end
 
 
-local function runCode(code,processing_node)
-	local tmpFile = get_temp_file()
-	local file = assert(io.open(processing_node.tempdir.."\\"..tmpFile .. ".lua", "w"))
-	file:write(code)
-	file:close()
-	local ok,err = copy_file("lua.exe", processing_node.tempdir.."\\"..tmpFile..[[.exe]])
-	if not ok then
-		return false, err
-	end
-	local command = (space2quote(processing_node.tempdir.."\\"..tmpFile..[[.exe]])..[[ ]]..space2quote(processing_node.tempdir.."\\"..tmpFile..[[.lua]])..[[ 2>&1]])
-	return processing_node.tempdir.."\\"..tmpFile, io.popen(command)
-end
 
 local function getVariableNames(code)
 	local variableNames = {}
@@ -482,10 +496,32 @@ local function swapReturns(code)
 	end
 end
 
+
+function modify_executable_references(code, number)
+	-- Find all string values in the code
+	local strings = {}
+	for str in string.gmatch(code, "'([^']*)'") do
+		strings[#strings + 1] = str
+	end
+	for str in string.gmatch(code, '"([^"]*)"') do
+		strings[#strings + 1] = str
+	end
+	for str in string.gmatch(code, "%[%[(.-)%]]") do
+		strings[#strings + 1] = str
+	end
+	-- Replace all occurrences of ".exe" with the desired number
+	for _, str in ipairs(strings) do
+	code = string.gsub(code, str, string.gsub(str, ".exe", number .. ".exe"))
+	end
+	
+	return code
+end
+
+
 local threadFunctions = {}
 
 function threadFunctions:isRunning()
-	if is_executable_running(self.processName..".exe") then
+	if is_executable_running(self.path_to_lua_executable..".exe") then
 		return true
 	else	
 		return false
@@ -493,12 +529,20 @@ function threadFunctions:isRunning()
 end
 
 function threadFunctions:cleanUP()
-	os.remove(self.processName..".exe")
-	os.remove(self.processName..".lua")
+	os.remove(self.path_to_lua_executable..".exe")
+	os.remove(self.path_to_lua_executable..".lua")
 end
 
-function threadFunctions:stopThread()
-	os.execute([[taskkill /F /IM "]]..endOfPath(self.processName)..[[.exe"]])
+function threadFunctions:getExecutableName()
+	return endOfPath(self.path_to_lua_executable..".exe")
+end
+
+function threadFunctions:start()
+	self.handle = io.popen(self.execute_command)
+	return self.handle
+end
+function threadFunctions:stop()
+	os.execute([[taskkill /F /IM "]]..(self:getExecutableName())..[["]])
 end
 
 function threadFunctions:getResults(force)
@@ -527,21 +571,11 @@ function threadFunctions:getResults(force)
 end
 
 
-local function storeThread(name,handle)
-	local thread = {}
-	thread.handle = handle
-	thread.processName = name
-	thread.__index = thread
-	for k,v in pairs(threadFunctions) do
-		if thread[k] == nil then
-			thread[k] = v
-		end
-	end
-	return thread
-end
-
 local nodeFunctions = {}
 
+function nodeFunctions:add_requirement(name_of_exe)
+	table.insert(self.requirements,name_of_exe)
+end
 function nodeFunctions:isRunning()
 	for i,thread in ipairs(self.threads) do
 		if thread:isRunning() then
@@ -586,31 +620,112 @@ end
 
 
 
-function nodeFunctions:stopThread(num)
+function nodeFunctions:stop(num)
 	for i,thread in ipairs(self.threads) do
 		if type(num) == "table" then
 			for j=1,#num do
 				if num[j] == i then
-					thread:stopThread()
+					thread:stop()
 				end
 			end
 		elseif type(num) == "number" then
 			if num == i then
-				thread:stopThread()
+				thread:stop()
 			end
 		elseif not num then
-			thread:stopThread()
+			thread:stop()
 		end
 	end
 	if not num then
 		self:cleanUP()
 	end
 end
+
+local function storeThread(name,execute_command)
+	local thread = {}
+	thread.execute_command = execute_command
+	thread.path_to_lua_executable = name
+	thread.__index = thread
+	for k,v in pairs(threadFunctions) do
+		if thread[k] == nil then
+			thread[k] = v
+		end
+	end
+	return thread
+end
+
+
+local function prepareExecutable(code,processing_node)
+	local tmpFile = get_temp_file()
+	local file = assert(io.open(processing_node.tempdir.."\\"..tmpFile .. ".lua", "w"))
+	file:write(code)
+	file:close()
+	local ok,err = copy_file("lua.exe", processing_node.tempdir.."\\"..tmpFile..[[.exe]])
+	if not ok then
+		return false, err
+	end
+	local command = (space2quote(processing_node.tempdir.."\\"..tmpFile..[[.exe]])..[[ ]]..space2quote(processing_node.tempdir.."\\"..tmpFile..[[.lua]])..[[ 2>&1]])
+	return processing_node.tempdir.."\\"..tmpFile, command
+end
+
+function nodeFunctions:newThread(function_or_string_of_function, ...)
+	local pass_to_thread = {...}
+	local function format_variable(value,variable_name)
+		local vtype = type(value)
+		local formatted_variable = "local "
+		if vtype == "table" then
+			formatted_variable = formatted_variable..table_to_string(value, variable_name)	
+		elseif vtype == "string" then
+			formatted_variable = formatted_variable..variable_name.." = ".."[["..value.."]]"
+		else
+			formatted_variable = formatted_variable..variable_name.." = "..tostring(value)
+		end
+		return formatted_variable
+	end
+	local code_to_run, function_params = getFunctionCode(function_or_string_of_function)
+	for param_index,variable_name in ipairs(function_params) do
+		if pass_to_thread[param_index] then	
+			code_to_run = format_variable(pass_to_thread[param_index],variable_name).."\n"..code_to_run
+		end
+	end
+	--self.libraries = extract_required_libraries(code_to_run)
+	--for _,library_path in pairs(self.libraries) do
+	--	--print(lib)
+	--	copy_file(library_path, self.tempdir.."\\"..library_path)
+	--end
+	if self.multiply_executable then
+		for _,name_of_exe in ipairs(self.requirements) do
+			local incremented_path = self.tempdir.."\\"..concatunderEXT(name_of_exe,#self.threads)
+			if not file_exists(incremented_path) then
+				copy_file(name_of_exe, incremented_path)
+			end
+			
+		end
+		code_to_run = modify_executable_references(code_to_run,#self.threads)
+	end
+	
+	code_to_run = swapReturns(code_to_run)
+	code_to_run = print_table_to_string_code.."\n"..code_to_run
+	local newthread = storeThread(prepareExecutable(code_to_run,self))
+	newthread.processing_node = self
+	table.insert(self.threads, newthread)
+	return newthread
+end
+
+
+function nodeFunctions:run(function_or_string_of_function, ...)
+	local new_thread = self:newThread(function_or_string_of_function, ...)
+	new_thread:start()
+	return new_thread
+end
+
 local function make_processing_node()
 	local processing_node = {}
 	processing_node.tempdir = get_temp_file_path()
 	os.execute([[mkdir "]]..processing_node.tempdir..[["]])
 	copy_file("lua5.1.dll", processing_node.tempdir.."\\"..[[lua5.1.dll]])
+	processing_node.multiply_executable = false
+	processing_node.requirements = {}
 	processing_node.threads = {}
 	processing_node.__index = processing_node
 	for k,v in pairs(nodeFunctions) do
@@ -622,56 +737,11 @@ local function make_processing_node()
 end
 
 
-function parallelism.run(function_or_string_of_function, params_to_pass, processing_node)
-	local processing_node = processing_node or make_processing_node()
-	
-	local function makeThread(pass_to_thread)
-		local function format_variable(value,variable_name)
-			local vtype = type(value)
-			local formatted_variable = "local "
-			if vtype == "table" then
-				formatted_variable = formatted_variable..table_to_string(value, variable_name)	
-			elseif vtype == "string" then
-				formatted_variable = formatted_variable..variable_name.." = ".."[["..value.."]]"
-			else
-				formatted_variable = formatted_variable..variable_name.." = "..tostring(value)
-			end
-			return formatted_variable
-		end
-		local code_to_run, function_params = getFunctionCode(function_or_string_of_function)
-		if type(pass_to_thread) == "table" then
-			for param_index,variable_name in ipairs(function_params) do
-				if pass_to_thread[param_index] then	
-					code_to_run = format_variable(pass_to_thread[param_index],variable_name).."\n"..code_to_run
-				end
-			end
-		elseif type(pass_to_thread) ~= "table" and pass_to_thread ~= nil then
-			if function_params[1] then
-				code_to_run = format_variable(pass_to_thread,function_params[1]).."\n"..code_to_run
-			end
-		end
-		--processing_node.libraries = extract_required_libraries(code_to_run)
-		--for _,library_path in pairs(processing_node.libraries) do
-		--	--print(lib)
-		--	copy_file(library_path, processing_node.tempdir.."\\"..library_path)
-		--end
-		code_to_run = swapReturns(code_to_run)
-		code_to_run = print_table_to_string_code.."\n"..code_to_run
-		local newthread = storeThread(runCode(code_to_run,processing_node))
-		newthread.processing_node = processing_node
-		table.insert(processing_node.threads, newthread)
-	end
-	
-	if type(params_to_pass) == "table" then
-		for _, elem in ipairs(params_to_pass) do
-			makeThread(elem)
-		end
-	else
-		makeThread(params_to_pass)
-	end
 
-	return processing_node
-end
+
+
+
+parallelism.new = make_processing_node
 
 
 return parallelism

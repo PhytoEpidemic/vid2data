@@ -4,6 +4,8 @@ lfsaddons = require("lfsaddons")
 parallelism = require("parallelism")
 require("functions")
 
+clearExecutableList()
+
 
 local config = {}
 
@@ -205,7 +207,7 @@ function splitframes()
 	local vidw, vidh = false, false
 	local showtimer = os.time()
 	printout("Loading image info...")
-	local processing_node = false
+	local processing_node = parallelism.new()
 	local max_threads = 1
 	local function getResults()
 		local results = processing_node:getResults(true)
@@ -299,17 +301,19 @@ function splitframes()
 						getwidthandheightofimage()
 						add_image_to_list()
 					else
-					
+						local function open_new_thread()
+							addToExecutableList(processing_node:run(getwidthandheightofimage,filepath):getExecutableName())
+						end
 						cancelProcessing = lfs.attributes("cancel.txt")
 						if (not cancelProcessing) and (processing_node and #processing_node.threads < max_threads) or not processing_node then
-							processing_node = parallelism.run(getwidthandheightofimage,{filepath},processing_node)
+							open_new_thread()
 						else
 							if cancelProcessing then
 								break
 							end
 							getResults()
-							
-							processing_node = parallelism.run(getwidthandheightofimage,{filepath},processing_node)
+							clearExecutableList()
+							open_new_thread()
 						end
 					end
 				elseif not vidw and config.samesize then
@@ -327,12 +331,11 @@ function splitframes()
 			
 		end
 	end
-	if processing_node and #processing_node.threads > 0 then
+	if #processing_node.threads > 0 then
 		getResults()
 	end
-	if processing_node then
-		processing_node:cleanUP()
-	end
+	processing_node:cleanUP(true)
+	processing_node:clear()
 	if cancelProcessing then
 		for _,temp in pairs(tempImages) do
 			os.remove(temp)
@@ -340,7 +343,7 @@ function splitframes()
 		return false
 	end
 	max_threads = 1
-	processing_node = false
+	processing_node = parallelism.new()
 	local last_percentpersecond = 0
 	--pause()
 	if startswith(config.WaH,"avg") then
@@ -430,10 +433,10 @@ function splitframes()
 				if width < config.width or height < config.height then
 					local xdiff = -1
 					local ydiff = -1
-					if height >= width then
-						xdiff = config.width
-					else
+					if (config.height/height) >= config.width/width then
 						ydiff = config.height
+					else
+						xdiff = config.width
 					end
 					madetemp = filepath
 					filepath = upscaleMediaByPx(filepath,xdiff,ydiff)
@@ -461,19 +464,22 @@ function splitframes()
 						require("functions")
 						local cells = get_cells(config.width,config.height,width,height)
 						
-						if #cells>1 then
-							for i,cell in ipairs(cells) do
-								sliceImageAndProcessCaption(cell.x,cell.y,cell.w,cell.h,config,outputName,width,height,filepath)
-							end
+						for i,cell in ipairs(cells) do
+							sliceImageAndProcessCaption(cell.x,cell.y,cell.w,cell.h,config,outputName,width,height,filepath)
 						end
 						return false
 					end
 					cancelProcessing = lfs.attributes("cancel.txt")
-					if (not cancelProcessing) and (processing_node and #processing_node.threads < max_threads) or not processing_node then
-						processing_node = parallelism.run(imagesplitloop,{{config,width,height,outputName,filepath}},processing_node)
+					local function open_new_thread()
+						addToExecutableList(processing_node:run(imagesplitloop,config,width,height,outputName,filepath):getExecutableName())
+					end
+					
+					if (not cancelProcessing) and (processing_node and #processing_node.threads < max_threads) then
+						open_new_thread()
 						--pause()
 					else
 						local results = processing_node:getResults(true)
+						clearExecutableList()
 						--for _,result in ipairs(results) do
 						--	print(result)
 						--	pause()
@@ -488,7 +494,7 @@ function splitframes()
 						if cancelProcessing then
 							break
 						end
-						processing_node = parallelism.run(imagesplitloop,{{config,width,height,outputName,filepath}},processing_node)
+						open_new_thread()
 					end
 					
 					
@@ -521,10 +527,9 @@ function splitframes()
 		progress = progress+1
 		
 	end
-	if processing_node then
-		processing_node:getResults(true)
-		processing_node:cleanUP(true)
-	end
+	processing_node:getResults(true)
+	processing_node:cleanUP(true)
+	clearExecutableList()
 	for _,temp in pairs(tempImages) do
 		os.remove(temp)
 	end

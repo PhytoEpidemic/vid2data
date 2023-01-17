@@ -10,7 +10,8 @@
  $form = New-Object System.Windows.Forms.Form
  $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedSingle
  $form.MaximizeBox = $false
- $form.MinimizeBox = $false
+ #$form.ControlBox  = $false
+ #$form.MinimizeBox = $false
  $form.Icon = "logo.ico"
  $form.Text = "vid2data"
  $form.Size = New-Object System.Drawing.Size(650,600)
@@ -27,8 +28,6 @@ $BackgroundCover = New-Object System.Windows.Forms.Label
 # $doneButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
  #$form.CancelButton = $doneButton
 
-
-
 $progressBar = New-Object System.Windows.Forms.ProgressBar
 $progressBar.Location = New-Object System.Drawing.Point(25,150)
 $progressBar.Size = New-Object System.Drawing.Size(250,30)
@@ -42,7 +41,7 @@ $timer.Interval = 1000 # fire event every 1000ms (1s)
 # Define the event handler for the timer's tick event
 $timer.Add_Tick({
     
-	$Processing = Get-Content "GUIoutput.txt"
+	$Processing = Test-Path "GUIoutput.txt"
 	
 	if ($Processing) {
 		
@@ -58,7 +57,7 @@ $fileContent = Get-Content $filePath
 # convert the file contents to a number
 $value = [int]$fileContent
 $progressBar.Value = $value
-$ProcessingCompleted = Get-Content "finished.txt"
+$ProcessingCompleted = Test-Path "finished.txt"
 if ($ProcessingCompleted) {
 	Remove-Item -Path "GUIoutput.txt"
 	$form.Controls.Remove($cancelButton)
@@ -134,48 +133,48 @@ $DeleteImagesCheckBoxTipFolder = (MakeToolTip)
  Add-Type -AssemblyName System.Windows.Forms
  $OpenFileDialog = New-Object System.Windows.Forms.OpenFileDialog
  $OpenFileDialog.Title = "Please Select File"
- $OpenFileDialog.InitialDirectory = $InitialDirectory
+ #$OpenFileDialog.InitialDirectory = $InitialDirectory
  $OpenFileDialog.filter = "Video files (*.mp4;*.mov)|*.mp4;*.mov"
  $openFileDialog.ShowHelp = $true
- If ($OpenFileDialog.ShowDialog() -eq "Cancel")
- {
- [System.Windows.Forms.MessageBox]::Show("No File Selected. Please select a file !", "Error", 0,
- [System.Windows.Forms.MessageBoxIcon]::Exclamation)
- }
+ $OpenFileDialog.ShowDialog()
+ ##If ( -eq "Cancel")
+ ##{
+ ###[System.Windows.Forms.MessageBox]::Show("No File Selected. Please select a file !", "Error", 0,
+ ###[System.Windows.Forms.MessageBoxIcon]::Exclamation)
+ ##}
  $Global:SelectedFile = $OpenFileDialog.FileName
  Return $SelectedFile #add this return
     
  }
  
- Function ChooseFolder($InitialDirectory) {
+ Function ChooseFolder($Message) {
     Add-Type -AssemblyName System.Windows.Forms
-    $FolderBrowserDialog = New-Object System.Windows.Forms.FolderBrowserDialog
-    $FolderBrowserDialog.Description = "Please select a folder"
-    $FolderBrowserDialog.RootFolder = "MyComputer"
-    $FolderBrowserDialog.SelectedPath = $InitialDirectory
-    $DialogResult = $FolderBrowserDialog.ShowDialog()
-    If ($DialogResult -eq "Cancel") {
-        [System.Windows.Forms.MessageBox]::Show("No folder selected. Please select a folder!", "Error", 0, [System.Windows.Forms.MessageBoxIcon]::Exclamation)
-    }
-    $Global:SelectedFolder = $FolderBrowserDialog.SelectedPath
-    return $SelectedFolder
+$FolderBrowse = New-Object System.Windows.Forms.OpenFileDialog -Property @{ValidateNames = $false;CheckFileExists = $false;RestoreDirectory = $true;FileName = $Message;}
+$null = $FolderBrowse.ShowDialog()
+$FolderName = Split-Path -Path $FolderBrowse.FileName
+return $FolderName
 }
 
  
-  $Browse = New-Object System.Windows.Forms.Button
-     $Browse.Location = New-Object System.Drawing.Point(300,74)
- $Browse.Size = New-Object System.Drawing.Size(100,23)
- $Browse.Text = 'Browse...'
- #
- $InputBrowseVid = {$x = ChooseVideoFile; $InputPathTextBox.Text = $x}
- $InputBrowseFolder = {$x = ChooseFolder; $InputPathTextBox.Text = $x}
+ $BrowseInputFolder = New-Object System.Windows.Forms.Button
+ $BrowseInputFolder.Location = New-Object System.Drawing.Point(300,74)
+ $BrowseInputFolder.Size = New-Object System.Drawing.Size(100,23)
+ $BrowseInputFolder.Text = 'Browse...'
+ $BrowseInputFolder.Add_Click({$x = ChooseFolder -Message "Input Folder"; $InputPathTextBox.Text = $x})
+ 
+ $BrowseInputVideo = New-Object System.Windows.Forms.Button
+ $BrowseInputVideo.Location = New-Object System.Drawing.Point(300,74)
+ $BrowseInputVideo.Size = New-Object System.Drawing.Size(100,23)
+ $BrowseInputVideo.Text = 'Browse...'
+ $BrowseInputVideo.Add_Click({$x = ChooseVideoFile; $InputPathTextBox.Text = $x})
+
  
  
- $BrowseFolder = New-Object System.Windows.Forms.Button
-     $BrowseFolder.Location = New-Object System.Drawing.Point(365,380)
- $BrowseFolder.Size = New-Object System.Drawing.Size(100,23)
- $BrowseFolder.Text = 'Browse...'
- $BrowseFolder.add_click({$x = ChooseFolder; $OutputPathTextBox.Text = $x})
+ $BrowseOutputFolder = New-Object System.Windows.Forms.Button
+ $BrowseOutputFolder.Location = New-Object System.Drawing.Point(365,380)
+ $BrowseOutputFolder.Size = New-Object System.Drawing.Size(100,23)
+ $BrowseOutputFolder.Text = 'Browse...'
+ $BrowseOutputFolder.add_click({$x = ChooseFolder -Message "Output Folder"; $OutputPathTextBox.Text = $x})
  
  $InputPathTextBox = New-Object System.Windows.Forms.TextBox
  $DimensionsTextBox = New-Object System.Windows.Forms.TextBox
@@ -344,8 +343,8 @@ $CustomCaptionTextBox.Location = New-Object System.Drawing.Point(10,310)
 $form.Controls.Add($CustomCaptionTextBoxLabel)
 
  
-$form.Controls.Add($Browse)
-$form.Controls.Add($BrowseFolder)
+
+$form.Controls.Add($BrowseOutputFolder)
  
  
  
@@ -365,14 +364,12 @@ $form.Controls.Add($DeleteImagesCheckBox)
 	
 	$DeleteImagesCheckBoxTipVid.SetToolTip($DeleteImagesCheckBox, "Delete the video frames after slicing them.")
 	
-	$Browse.remove_click($InputBrowseFolder)
-	
-	$Browse.add_click($InputBrowseVid)
 	$form.Controls.Add($RemoveBlurDropDownLabel)
 	
 	$form.Controls.Remove($SameSizeCheckBox)
-	$DeleteImagesCheckBox.Text = "Delete frames"
-
+	$DeleteImagesCheckBox.Text = "Delete frames"	
+	$form.Controls.Remove($BrowseInputFolder)
+	$form.Controls.Add($BrowseInputVideo)
 	
 	
 	
@@ -385,15 +382,14 @@ $form.Controls.Add($DeleteImagesCheckBox)
 	$form.Controls.Remove($RemoveBlurDropDownLabel)
 	$DeleteImagesCheckBoxTipVid.RemoveAll()
 	$DeleteImagesCheckBoxTipFolder.SetToolTip($DeleteImagesCheckBox, "Delete the original images after slicing. (Always make backups!!!)")
-	#$form.Controls.Remove($Browse)
-	$Browse.remove_click($InputBrowseVid)
-	$Browse.add_click($InputBrowseFolder)
-	#$Browse.Tag = $ChooseFolder
+	#$form.Controls.Remove($BrowseInputFolder)
+	#$BrowseInputFolder.Tag = $ChooseFolder
 	$form.Controls.Remove($keyFramesCheckBox)
 		$form.Controls.Add($SameSizeCheckBox)
 		$DeleteImagesCheckBox.Text = "Delete Original Images"
 
-		
+		$form.Controls.Remove($BrowseInputVideo)
+		$form.Controls.Add($BrowseInputFolder)
 		
 	
 	
@@ -464,8 +460,9 @@ $OKButton.Add_Click({
 		$CustomCaptionTextBoxLabel,
 		$RemoveBlurDropDown,
 		$RemoveBlurDropDownLabel,
-		$Browse,
-		$BrowseFolder,
+		$BrowseInputFolder,
+		$BrowseInputVideo,
+		$BrowseOutputFolder,
 		$OKButton,
 		$DimensionsTextBox, 
 		$DimensionsTextBoxLabel, 
@@ -486,17 +483,25 @@ $OKButton.Add_Click({
 # simulate a process that takes 10 seconds
     
 
-
 # Rename the executable
 Rename-Item -Path "vid2data.exe" -NewName $uniqueName
 $luaScript = "makedata.lua"
 $arg = "-b"
-# Start the process
-Start-Process -FilePath $uniqueName -ArgumentList $luaScript, $arg -RedirectStandardError "error.txt" -PassThru
+
+# Check if README.md exists
+if (Test-Path "README.md") {
+	Start-Process -FilePath $uniqueName -ArgumentList $luaScript, $arg -RedirectStandardError "error.txt" -PassThru
+} else {
+	Start-Process -FilePath $uniqueName -ArgumentList $luaScript, $arg -RedirectStandardError "error.txt" -PassThru -WindowStyle Hidden
+}
 
 
 
-# -WindowStyle Hidden
+
+
+
+
+#
 
 
 })
@@ -507,54 +512,82 @@ $uniqueName = -join (65..90 + 97..122 | Get-Random -Count 16 | % {[char]$_}) + '
 Function stopProcess ($uniqueName)
 {
 	taskkill /f /IM $uniqueName
+	
+	$filePath = "runningProcesses.txt"
+	foreach ($line in Get-Content $filePath) {
+		taskkill /f /im $line 
+	}
+	taskkill /f /IM "ffmpeg.exe"
 	Rename-Item -Path $uniqueName -NewName "vid2data.exe"
 }
-
-$cancelTimer = New-Object System.Windows.Forms.Timer
-$cancelTimer.Interval = 500 # fire event every 1000ms (1s)
-# Define the event handler for the timer's tick event
 $startTime = Get-Date
-$cancelTimer.Add_Tick({
-	# Get the current time
-    $currentTime = Get-Date
-    
-
-    # Calculate the time elapsed
-    $timeElapsed = $currentTime - $startTime
-	stopProcess($uniqueName)
-	
-	$ProcessingCanceled = Get-Content "finished.txt"
-	if ($timeElapsed -gt 5 -or $ProcessingCanceled) {
-		stopProcess -uniqueName $uniqueName
-		Remove-Item -Path "cancel.txt"
-		$timer.Stop()
- $cancelTimer.Stop()
-		$form.Close()
-	}
-	
-})
-
 
 $cancelButton.Add_Click({
    
-	$Processing = Get-Content "GUIoutput.txt"
-	
+	$Processing = Test-Path "GUIoutput.txt"
+	$BackgroundCover.Text = "Canceling..."
 	if ($Processing) {
 		$startTime = Get-Date
+        Set-Variable -Name 'startTime' -Value $startTime -Scope 'global'
+		$timer.Stop()
+		$progressBar.Maximum = 4
+		$progressBar.Value = 0
 		$cancelTimer.Start()
 		Out-File -FilePath "cancel.txt" -InputObject "c" -Encoding ascii -Append
 	} else {
-		$timer.Stop()
- $cancelTimer.Stop()
 		$form.Close()
 		
 	}
 })
+
+
+
+$cancelTimer = New-Object System.Windows.Forms.Timer
+$cancelTimer.Interval = 500
+$cancelTimer.Add_Tick({
+    $currentTime = Get-Date
+    $timeElapsed = New-TimeSpan -Start $startTime -End $currentTime
+	$progressBar.Value = $timeElapsed.TotalSeconds
+	$BackgroundCover.Text = "Canceling..."
+	$ProcessingCanceled = Test-Path "finished.txt"
+	if ($timeElapsed.TotalSeconds -gt $progressBar.Maximum -or $ProcessingCanceled) {
+		
+		
+		Remove-Item -Path "cancel.txt"
+		Remove-Item -Path "GUIoutput.txt"
+		$form.Close()
+	}
+	
+})
+
+
+
+
+
+
+
+
+
+$form.Add_FormClosing({
+	$timer.Stop()
+	$cancelTimer.Stop()
+
+	$Processing = Test-Path "GUIoutput.txt"
+	$BackgroundCover.Text = "Canceling..."
+	
+	if ($Processing) {
+		Out-File -FilePath "cancel.txt" -InputObject "c" -Encoding ascii -Append
+		Start-Sleep -Seconds 2	
+	}
+	
+	stopProcess -uniqueName $uniqueName
+})
+
+
 $doneButton.Add_Click({
-    stopProcess($uniqueName)
 	$form.Close()
 })
- $form.Topmost = $true
+ $form.Topmost = $false
     
  $form.Add_Shown({$form.Activate()})
     

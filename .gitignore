@@ -1,2 +1,10 @@
 ffmpeg.exe
 GUIoutput.txt
+finished.txt
+error.txt
+processinfo.txt
+progress.txt
+test.bat
+runningProcesses.txt
+
+

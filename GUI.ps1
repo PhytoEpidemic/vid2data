@@ -41,30 +41,30 @@ $timer.Interval = 1000 # fire event every 1000ms (1s)
 # Define the event handler for the timer's tick event
 $timer.Add_Tick({
     
-	$Processing = Test-Path "GUIoutput.txt"
 	
-	if ($Processing) {
+	if (Test-Path "GUIoutput.txt") {
+		if (Test-Path "processinfo.txt") {
+			$BackgroundCover.Text = (Get-Content "processinfo.txt") -join [Environment]::NewLine
+		}
 		
-		$BackgroundCover.Text = (Get-Content "processinfo.txt") -join [Environment]::NewLine
 
-		
-		$filePath = "progress.txt"
-	
-# read the contents of the text file
-
-
-$fileContent = Get-Content $filePath
-# convert the file contents to a number
-$value = [int]$fileContent
-$progressBar.Value = $value
-$ProcessingCompleted = Test-Path "finished.txt"
-if ($ProcessingCompleted) {
-	Remove-Item -Path "GUIoutput.txt"
-	$form.Controls.Remove($cancelButton)
-	 $form.Controls.Add($doneButton)
-}
-	
-
+		if (Test-Path "progress.txt") {
+			$filePath = "progress.txt"
+				
+			# read the contents of the text file
+			
+			
+			$fileContent = Get-Content $filePath
+			# convert the file contents to a number
+			$value = [int]$fileContent
+			$progressBar.Value = $value
+			if (Test-Path "finished.txt") {
+				Remove-Item -Path "GUIoutput.txt"
+				$form.Controls.Remove($cancelButton)
+				$form.Controls.Add($doneButton)
+			}
+				
+		}
 
 
 # set the progress bar's value
@@ -425,7 +425,9 @@ $form.Controls.Add($OKButton)
 
 # Add an event handler for the OK button's Click event
 $OKButton.Add_Click({
-    # Get the text from the text boxes
+    Remove-Item -Path "processinfo.txt"
+    Remove-Item -Path "progress.txt"
+	# Get the text from the text boxes
     $fileorfolder = $ChooseTypeDropDown.SelectedItem
     
     $text1 = $InputPathTextBox.Text
@@ -572,10 +574,9 @@ $form.Add_FormClosing({
 	$timer.Stop()
 	$cancelTimer.Stop()
 
-	$Processing = Test-Path "GUIoutput.txt"
 	
 	
-	if ($Processing) {
+	if ((Get-Process -Name $uniqueName -ErrorAction SilentlyContinue)) {
 		$BackgroundCover.Text = "Canceling..."
 		
 		Out-File -FilePath "cancel.txt" -InputObject "c" -Encoding ascii -Append

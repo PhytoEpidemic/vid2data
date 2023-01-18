@@ -511,7 +511,7 @@ function modify_executable_references(code, number)
 	end
 	-- Replace all occurrences of ".exe" with the desired number
 	for _, str in ipairs(strings) do
-	code = string.gsub(code, str, string.gsub(str, ".exe", number .. ".exe"))
+	code = string.gsub(code, str, string.gsub(str, ".exe", tostring(number) .. ".exe"))
 	end
 	
 	return code
@@ -528,7 +528,7 @@ function threadFunctions:isRunning()
 	end
 end
 
-function threadFunctions:cleanUP()
+function threadFunctions:remove()
 	os.remove(self.path_to_lua_executable..".exe")
 	os.remove(self.path_to_lua_executable..".lua")
 end
@@ -586,23 +586,28 @@ function nodeFunctions:isRunning()
 end
 
 function nodeFunctions:clear(allthreads)
-
+for _,thread in ipairs(self.threads) do
+	thread:remove()
+end
 self.threads = {}
 self.results = {}
 
 
 end
-function nodeFunctions:cleanUP(allthreads)
-	if allthreads then
-		for _,thread in ipairs(self.threads) do
-			thread:cleanUP()
-		end
+function nodeFunctions:remove()
+
+	for _,thread in ipairs(self.threads) do
+		thread:remove()
 	end
 	os.remove(self.tempdir.."\\"..[[lua5.1.dll]])
 	--for _,library_path in pairs(self.libraries) do
 	--	os.remove(self.tempdir.."\\"..library_path)
 	--end
+	for path_to_exe,_ in pairs(self.execache) do
+		os.remove(path_to_exe)
+	end
 	os.execute([[rmdir "]]..self.tempdir..[["]])
+	self = nil
 end
 
 
@@ -637,7 +642,7 @@ function nodeFunctions:stop(num)
 		end
 	end
 	if not num then
-		self:cleanUP()
+		self:remove()
 	end
 end
 
@@ -695,9 +700,10 @@ function nodeFunctions:newThread(function_or_string_of_function, ...)
 	--end
 	if self.multiply_executable then
 		for _,name_of_exe in ipairs(self.requirements) do
-			local incremented_path = self.tempdir.."\\"..concatunderEXT(name_of_exe,#self.threads)
+			local incremented_path = concatunderEXT(name_of_exe,#self.threads)
 			if not file_exists(incremented_path) then
 				copy_file(name_of_exe, incremented_path)
+				self.execache[incremented_path] = true
 			end
 			
 		end
@@ -727,6 +733,7 @@ local function make_processing_node()
 	processing_node.multiply_executable = false
 	processing_node.requirements = {}
 	processing_node.threads = {}
+	processing_node.execache = {}
 	processing_node.__index = processing_node
 	for k,v in pairs(nodeFunctions) do
 		if processing_node[k] == nil then

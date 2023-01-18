@@ -222,7 +222,7 @@ function splitframes()
 				imagecount = imagecount+1
 				
 			end
-			processing_node.threads[t]:cleanUP()
+			--processing_node.threads[t]:remove()
 		end
 		processing_node:clear()
 	end
@@ -334,16 +334,17 @@ function splitframes()
 	if #processing_node.threads > 0 then
 		getResults()
 	end
-	processing_node:cleanUP(true)
-	processing_node:clear()
+	processing_node:remove()
 	if cancelProcessing then
 		for _,temp in pairs(tempImages) do
 			os.remove(temp)
 		end
 		return false
 	end
-	max_threads = 1
+	max_threads = 2
 	processing_node = parallelism.new()
+	--processing_node.multiply_executable = true
+	processing_node:add_requirement("ffmpeg.exe")
 	local last_percentpersecond = 0
 	--pause()
 	if startswith(config.WaH,"avg") then
@@ -396,10 +397,10 @@ function splitframes()
 			end
 			if config.cfilename == "" then
 				if percentpersecond >= last_percentpersecond then
-					max_threads = math.min(4,math.ceil(max_threads*1.5))
+					max_threads = math.min(2,math.ceil(max_threads*1.5))
 					
 				else
-					max_threads = math.min(4,math.ceil(max_threads*0.8))
+					max_threads = math.min(2,math.ceil(max_threads*0.8))
 				end
 			end
 			last_percentpersecond = percentpersecond
@@ -449,7 +450,7 @@ function splitframes()
 					--	end
 					--end
 					--filepath = results[1][1]
-					--tempnode:cleanUP(true)
+					--tempnode:remove()
 					--tempnode:clear()
 					width, height = imagedim.GetImageWidthHeight(filepath)
 				end
@@ -465,7 +466,7 @@ function splitframes()
 						local cells = get_cells(config.width,config.height,width,height)
 						
 						for i,cell in ipairs(cells) do
-							sliceImageAndProcessCaption(cell.x,cell.y,cell.w,cell.h,config,outputName,width,height,filepath)
+							sliceImageAndProcessCaption(cell.x,cell.y,cell.w,cell.h,config,outputName,width,height,filepath,"ffmpeg.exe")
 						end
 						return false
 					end
@@ -488,7 +489,7 @@ function splitframes()
 						
 						
 						for _,thread in pairs(processing_node.threads) do
-							thread:cleanUP()
+							thread:remove()
 						end
 						processing_node:clear()
 						if cancelProcessing then
@@ -528,7 +529,7 @@ function splitframes()
 		
 	end
 	processing_node:getResults(true)
-	processing_node:cleanUP(true)
+	processing_node:remove()
 	clearExecutableList()
 	for _,temp in pairs(tempImages) do
 		os.remove(temp)

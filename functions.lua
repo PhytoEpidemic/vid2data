@@ -191,7 +191,7 @@ end
 
 
 function get_cells(target_w, target_h, orig_w, orig_h, crop_tolerance)
-	crop_tolerance = crop_tolerance or 32
+	crop_tolerance = crop_tolerance or 0.1
 	local cells = {}
 	local x, y = 0, 0
 	local wsplits = orig_w/target_w
@@ -207,13 +207,13 @@ function get_cells(target_w, target_h, orig_w, orig_h, crop_tolerance)
 		for _=1,math.ceil(wsplits) do
 			table.insert(cells, {x=math.min(orig_w-target_w,math.max(0,x-overlap_x)), y=math.min(orig_h-target_h,math.max(0,y-overlap_y)), w=target_w, h=target_h})
 			--printout(x,y,overlap_x,overlap_y)
-			if (target_w-overlap_x*2 < crop_tolerance and wfull == 1) then
+			if (target_w-overlap_x*2 < orig_w*crop_tolerance and wfull == 1) then
 				break
 			end
 			
 			x = x + (target_w)
 		end
-		if (target_h-overlap_y*2 < crop_tolerance and hfull == 1) then
+		if (target_h-overlap_y*2 < orig_h*crop_tolerance and hfull == 1) then
 			break
 		end
 		x = 0
@@ -348,7 +348,7 @@ function upscaleMedia(imagename,factor,suffix)
 	local factor = tostring(factor or 2)
 	suffix = suffix or "_d"..factor
 	local outputname = incrementPathName(concatunderEXT(imagename,suffix))
-	exe([[ffmpeg -i "]]..imagename..[[" -vf scale="iw*]]..factor..[[:ih*]]..factor..[[" -sws_flags lanczos+full_chroma_inp "]]..outputname..[["]])
+	exe([[ffmpeg.exe -i "]]..imagename..[[" -vf scale="iw*]]..factor..[[:ih*]]..factor..[[" -sws_flags lanczos+full_chroma_inp "]]..outputname..[["]])
 	return outputname
 end
 
@@ -356,17 +356,18 @@ function upscaleMediaByPx(imagename,width,height,suffix)
 	--require("functions")
 	suffix = suffix or "_d"..tostring(width)..[[x]]..tostring(height)
 	local outputname = incrementPathName(concatunderEXT(imagename,suffix))
-	io.popen([[ffmpeg -i "]]..imagename..[[" -vf scale=]]..tostring(width)..[[:]]..tostring(height)..[[ -sws_flags lanczos+full_chroma_inp "]]..outputname..[[" 2>&1]]):close()
+	io.popen([[ffmpeg.exe -i "]]..imagename..[[" -vf scale=]]..tostring(width)..[[:]]..tostring(height)..[[ -sws_flags lanczos+full_chroma_inp "]]..outputname..[[" 2>&1]]):close()
 	return outputname
 end
-function cropImage(pathtofile,newfilename,xpos,ypos,cwidth,cheight)
-	exe([[ffmpeg -i "]]..pathtofile..[[" -vf "crop=]]..tostring(cwidth)..[[:]]..tostring(cheight)..[[:]]..tostring(xpos)..[[:]]..tostring(ypos)..[[" "]]..newfilename..[["]])
+function cropImage(pathtofile,newfilename,xpos,ypos,cwidth,cheight,exename)
+	exename = exename or "ffmpeg.exe"
+	exe(exename..[[ -i "]]..pathtofile..[[" -vf "crop=]]..tostring(cwidth)..[[:]]..tostring(cheight)..[[:]]..tostring(xpos)..[[:]]..tostring(ypos)..[[" "]]..newfilename..[["]])
 end
 
 function repairImage(imagename,suffix)
 	suffix = suffix or "_repaired"
 	local outputname = incrementPathName(concatunderEXT(imagename,suffix))..".png"
-	exe([[ffmpeg -i "]]..imagename..[[" -vf copy "]]..outputname..[["]])
+	exe([[ffmpeg.exe -i "]]..imagename..[[" -vf copy "]]..outputname..[["]])
 	return outputname
 end
 
@@ -404,7 +405,7 @@ function makecaptionfile(imagefilepath,caption,config)
 	end
 end
 
-function sliceImageAndProcessCaption(x,y,w,h,config,outputName,width,height,filepath)
+function sliceImageAndProcessCaption(x,y,w,h,config,outputName,width,height,filepath,exe_name)
 	local tempoutputName = incrementPathName(outputName)
 	if w < 1 then
 		w = (width+w)-x
@@ -412,7 +413,7 @@ function sliceImageAndProcessCaption(x,y,w,h,config,outputName,width,height,file
 	if h < 1 then
 		h = (height+h)-y
 	end
-	cropImage(filepath,tempoutputName,x,y,w,h)
+	cropImage(filepath,tempoutputName,x,y,w,h,exe_name)
 	local editcaption = false
 	if config.captionfunction then
 		editcaption = getcaptionfile(filepath,config)

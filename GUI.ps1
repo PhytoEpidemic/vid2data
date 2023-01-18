@@ -518,7 +518,7 @@ Function stopProcess ($uniqueName)
 		taskkill /f /im $line 
 	}
 	taskkill /f /IM "ffmpeg.exe"
-	Rename-Item -Path $uniqueName -NewName "vid2data.exe"
+	
 }
 $startTime = Get-Date
 
@@ -573,18 +573,31 @@ $form.Add_FormClosing({
 	$cancelTimer.Stop()
 
 	$Processing = Test-Path "GUIoutput.txt"
-	$BackgroundCover.Text = "Canceling..."
+	
 	
 	if ($Processing) {
+		$BackgroundCover.Text = "Canceling..."
+		
 		Out-File -FilePath "cancel.txt" -InputObject "c" -Encoding ascii -Append
-		Start-Sleep -Seconds 2	
+		Start-Sleep -Seconds 1
+		$counter = 0
+		while ((Get-Process -Name $uniqueName -ErrorAction SilentlyContinue) -and ($counter -lt 5)) {
+			Start-Sleep -Seconds 1
+			$counter++
+		}
+		if ($counter -eq 5) {
+			stopProcess -uniqueName $uniqueName
+		}
+	}
+	if (Test-Path $uniqueName) {
+		Rename-Item -Path $uniqueName -NewName "vid2data.exe"
 	}
 	
-	stopProcess -uniqueName $uniqueName
 })
 
 
 $doneButton.Add_Click({
+	$BackgroundCover.Text = "Bye!"
 	$form.Close()
 })
  $form.Topmost = $false

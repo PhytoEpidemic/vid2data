@@ -339,7 +339,7 @@ function removeBl(config)
 	local OK, er = pcall(removeBlur,config)
 	if not OK then
 		print(er)
-		pause()
+		--pause()
 	end
 end
 
@@ -366,7 +366,7 @@ end
 
 function repairImage(imagename,suffix)
 	suffix = suffix or "_repaired"
-	local outputname = incrementPathName(concatunderEXT(imagename,suffix))..".png"
+	local outputname = incrementPathName(concatunderEXT(imagename,suffix)..".png")
 	exe([[ffmpeg.exe -i "]]..imagename..[[" -vf copy "]]..outputname..[["]])
 	return outputname
 end

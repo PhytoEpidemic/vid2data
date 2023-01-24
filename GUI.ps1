@@ -213,6 +213,11 @@ return $FolderName
  $RemoveBlurDropDownLabel.Location = New-Object System.Drawing.Point(($CheckBoxesXLocation),($CheckBoxesYLocation+90))
  $RemoveBlurDropDownLabel.Size = New-Object System.Drawing.Size(80,23)
  $RemoveBlurDropDownLabel.Text = "Blurry frames threshold:"
+ 
+	$CropToleranceDropDownLabel = New-Object System.Windows.Forms.Label
+ $CropToleranceDropDownLabel.Location = New-Object System.Drawing.Point(($CheckBoxesXLocation+150),($CheckBoxesYLocation+90))
+ $CropToleranceDropDownLabel.Size = New-Object System.Drawing.Size(80,23)
+ $CropToleranceDropDownLabel.Text = "Crop tolerance:"
 	
 	
 	
@@ -231,6 +236,22 @@ return $FolderName
 	
 	(MakeToolTip).SetToolTip($RemoveBlurDropDown, "Threshold blur level for removal. Lower number will remove more frames.")
 	
+	
+	$CropToleranceDropDown = new-object System.Windows.Forms.combobox
+ $CropToleranceDropDown.Location = new-object System.Drawing.Size(($CheckBoxesXLocation+230),($CheckBoxesYLocation+90))
+ $CropToleranceDropDown.Size = new-object System.Drawing.Size(65,30)
+ $CropToleranceDropDownOptions = @("0.0","0.1","0.2","0.3","0.4","0.5","0.6","0.7","0.8","0.9","1.0")
+ 
+ foreach($option in $CropToleranceDropDownOptions)
+	{
+		[void] $CropToleranceDropDown.Items.Add($option)
+	}
+ 
+ $CropToleranceDropDown.SelectedIndex = [System.Array]::IndexOf($CropToleranceDropDownOptions, "0.1")
+
+ $CropToleranceDropDown.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList;
+	
+	(MakeToolTip).SetToolTip($CropToleranceDropDown, "For smaller images that will be split into only 2 across, if the image is small than the dimensions entered + this multiple then the image will be cropped once at the middle.")
 	
  $ChooseTypeDropDownLabel = New-Object System.Windows.Forms.Label
  $ChooseTypeDropDownLabel.Location = New-Object System.Drawing.Point(100,30)
@@ -345,8 +366,8 @@ $form.Controls.Add($CustomCaptionTextBoxLabel)
  
 
 $form.Controls.Add($BrowseOutputFolder)
- 
- 
+ $form.Controls.Add($CropToleranceDropDown)
+ $form.Controls.Add($CropToleranceDropDownLabel)
  
 $form.Controls.Add($DeleteImagesCheckBox)
 
@@ -441,8 +462,9 @@ $OKButton.Add_Click({
 	$text4 = $CustomCaptionTextBox.Text
 	$text5 = $OutputPathTextBox.Text
 	$RemoveBlurLevel = $RemoveBlurDropDown.SelectedItem
+	$CropToleranceLevel = $CropToleranceDropDown.SelectedItem
     # Write the text to the file
-    Out-File -FilePath "GUIoutput.txt" -InputObject "$fileorfolder`n$text1`n$text2`n$keyFramesValue`n$SameSizeValue`n$DeleteImagesValue`n$text3`n$text4`n$text5`n$RemoveBlurLevel" -Encoding ascii -Append
+    Out-File -FilePath "GUIoutput.txt" -InputObject "$fileorfolder`n$text1`n$text2`n$keyFramesValue`n$SameSizeValue`n$DeleteImagesValue`n$text3`n$text4`n$text5`n$RemoveBlurLevel`n$CropToleranceLevel" -Encoding ascii -Append
     
    # $form.Close() # Close the form
    # simulate a process that takes 10 seconds
@@ -462,6 +484,8 @@ $OKButton.Add_Click({
 		$CustomCaptionTextBoxLabel,
 		$RemoveBlurDropDown,
 		$RemoveBlurDropDownLabel,
+		$CropToleranceDropDown,
+		$CropToleranceDropDownLabel,
 		$BrowseInputFolder,
 		$BrowseInputVideo,
 		$BrowseOutputFolder,

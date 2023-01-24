@@ -14,7 +14,7 @@ function printset()
 end
 
 
-local config_loader = {"InputType","vfile","WaH","keyframesonly","samesize","delimg","cfilename","caption","OutputFolder","removeblur"}
+local config_loader = {"InputType","vfile","WaH","keyframesonly","samesize","delimg","cfilename","caption","OutputFolder","removeblur","crop_tolerance"}
 
 rtitle()
 --os.remove("GUIoutput.txt")
@@ -48,7 +48,7 @@ end
 if config.InputType == "Video" then
 	config.samesize = true
 end
-
+config.crop_tolerance = tonumber(config.crop_tolerance or 0)
 
 --pause()
 
@@ -208,7 +208,7 @@ function splitframes()
 	local showtimer = os.time()
 	printout("Loading image info...")
 	local processing_node = parallelism.new()
-	local max_threads = 1
+	local max_threads = 2
 	local function getResults()
 		local results = processing_node:getResults(true)
 		for t,result in ipairs(results) do
@@ -249,7 +249,7 @@ function splitframes()
 				cls()
 				printout("Loading image info...")
 				printout("Folder: "..framesFolder)
-				printout("Workers: "..max_threads)
+				--printout("Workers: "..max_threads)
 				printout("Checking "..directory_item_count_max.." files")
 				printout("images loaded: "..tostring(imagecount))
 				--pause()
@@ -263,10 +263,10 @@ function splitframes()
 					last_image_count = imagecount
 					
 					if loading_speed >= last_loading_speed then
-						max_threads = math.min(128,math.ceil(max_threads*1.5))
+						max_threads = math.min(64,math.ceil(max_threads*1.2))
 						
 					else
-						max_threads = math.min(128,math.ceil(max_threads*0.8))
+						max_threads = math.min(64,math.ceil(max_threads*0.8))
 					end
 					last_loading_speed = loading_speed
 				end
@@ -412,7 +412,7 @@ function splitframes()
 			cls()
 			printout("Slicing: "..tostring(math.floor(percentagecomplete*1000)/10).."% ETA: "..ETA)
 			printout("Folder: "..framesFolder)
-			printout("Workers: "..max_threads)
+			--printout("Workers: "..max_threads)
 			printout("Images processed: "..tostring(math.max(progress-max_threads,0)).." / "..imagecount)
 			set_progress(math.floor(percentagecomplete*100))
 			--pause()
@@ -461,9 +461,9 @@ function splitframes()
 				if startswith(config.WaH,"crop") then
 					sliceImageAndProcessCaption(config.xpos,config.ypos,config.width,config.height,config,outputName,width,height,filepath)
 				else
-					local function imagesplitloop(config,width,height,outputName,filepath)
+					local function imagesplitloop(config,width,height,outputName,filepath,crop_tolerance)
 						require("functions")
-						local cells = get_cells(config.width,config.height,width,height)
+						local cells = get_cells(config.width,config.height,width,height,crop_tolerance)
 						
 						for i,cell in ipairs(cells) do
 							sliceImageAndProcessCaption(cell.x,cell.y,cell.w,cell.h,config,outputName,width,height,filepath,"ffmpeg.exe")
@@ -472,7 +472,7 @@ function splitframes()
 					end
 					cancelProcessing = lfs.attributes("cancel.txt")
 					local function open_new_thread()
-						addToExecutableList(processing_node:run(imagesplitloop,config,width,height,outputName,filepath):getExecutableName())
+						addToExecutableList(processing_node:run(imagesplitloop,config,width,height,outputName,filepath,config.crop_tolerance):getExecutableName())
 					end
 					
 					if (not cancelProcessing) and (processing_node and #processing_node.threads < max_threads) then
